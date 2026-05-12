@@ -1,24 +1,35 @@
-import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
-import { Stack } from 'expo-router';
-import { StatusBar } from 'expo-status-bar';
-import 'react-native-reanimated';
+import { AuthProvider } from "@/src/providers/auth-provider";
+import { RemindersProvider } from "@/src/providers/reminders-provider";
+import { Stack } from "expo-router";
+import { LogBox } from "react-native";
+import { useEffect, useState } from "react";
+import { seedMockData } from "@/src/mock-data";
 
-import { useColorScheme } from '@/hooks/use-color-scheme';
-
-export const unstable_settings = {
-  anchor: '(tabs)',
-};
+LogBox.ignoreLogs([
+  "expo-notifications: Android Push notifications",
+]);
 
 export default function RootLayout() {
-  const colorScheme = useColorScheme();
+  const [isSeeded, setIsSeeded] = useState(false);
+
+  useEffect(() => {
+    const seed = async () => {
+      await seedMockData();
+      setIsSeeded(true);
+    };
+    seed();
+  }, []);
+
+  if (!isSeeded) return null;
 
   return (
-    <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-      <Stack>
-        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-        <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
-      </Stack>
-      <StatusBar style="auto" />
-    </ThemeProvider>
+    <AuthProvider>
+      <RemindersProvider>
+        <Stack>
+          <Stack.Screen name="(app)" options={{ headerShown: false }} />
+          <Stack.Screen name="(auth)" options={{ headerShown: false }} />
+        </Stack>
+      </RemindersProvider>
+    </AuthProvider>
   );
 }
