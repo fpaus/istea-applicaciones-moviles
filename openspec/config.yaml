@@ -1,0 +1,43 @@
+schema: spec-driven
+
+# Project context (shown to AI in ALL artifacts).
+# The authoritative, detailed description lives in openspec/CONTEXT.md.
+context: |
+  Recurring Reminders — a React Native + Expo (TypeScript) mobile app for
+  scheduling local reminder notifications at a chosen time of day, optionally
+  repeating daily. Includes local (on-device) email/password auth. No backend.
+
+  The authoritative description of the architecture, domain model, current
+  features, MVP limitations, and planned/future features lives in
+  `openspec/CONTEXT.md`. Read it before working on any change that touches
+  business behavior, domain terminology, authorization, workflow rules,
+  architecture, or data-model semantics.
+
+  Tech stack: Expo SDK 54, expo-router (file-based routing), React 19,
+  React Native 0.81, TypeScript. Local notifications via expo-notifications;
+  persistence via @react-native-async-storage/async-storage.
+
+  Development philosophy:
+    - Conventional Commits (feat, fix, refactor, docs, ...).
+    - TDD/BDD: test-first using Jest + React Native Testing Library.
+    - Clean Code: high emphasis on readability, SOLID principles, and DRY.
+
+# Per-artifact rules (each rule appears ONLY for its matching artifact).
+rules:
+  specs:
+    - 'Format: use "Given-When-Then" for behavioral specifications.'
+    - 'Acceptance criteria are mandatory for every spec.'
+    - 'Alignment: always cross-reference openspec/CONTEXT.md before proposing or implementing changes that affect business behavior, domain terminology, authorization, workflow rules, architecture, or data-model semantics.'
+    - 'Context maintenance: any change that modifies business behavior, domain terminology, authorization, workflow rules, architectural understanding, or significant data-model meaning must update openspec/CONTEXT.md in the same change.'
+    - 'Context echo: if a rule from openspec/CONTEXT.md is important to the correctness of the current change, restate it in the change artifacts so verification and future implementation work do not depend on implicit context only.'
+  proposal:
+    - "Keep proposals under 500 words; include a 'Non-goals' section."
+    - 'Prioritize architectural consistency and security (no secrets in code or artifacts).'
+    - 'Context echo: call out any relevant MVP limitations, future-intent distinctions, authorization constraints, or workflow rules from openspec/CONTEXT.md that materially shape the scope of the change.'
+  tasks:
+    - 'Granularity: max 2 hours per task.'
+    - 'Sequence: tasks follow the Research -> Strategy -> Execution (Plan / Act / Validate) lifecycle.'
+    - 'Red-Green-Refactor is mandatory and tests must precede implementation: first define the interface, then write the test, verify it fails, implement the code, and finally refactor for clarity and performance.'
+    - 'Always prefer reusable components, organized via Atomic Design as Components/Atoms, Components/Molecules, and Components/Organisms.'
+    - 'Always encapsulate logic in custom hooks; keep components as dumb (presentational) as possible.'
+    - 'Always run tests; never push code.'
