@@ -1,51 +1,26 @@
-import { useContext, useState, useEffect } from "react";
-import { AuthContext } from "../providers/auth-provider";
-import { authService, User } from "../services/auth";
+import { useMemo } from "react";
+import { useAuthStore } from "../stores/auth-store";
 
-export function useProvideAuth() {
-  const [user, setUser] = useState<User | null>(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    const checkAuth = async () => {
-      const storedUser = await authService.getUser();
-      if (storedUser) {
-        setUser(storedUser);
-      }
-      setLoading(false);
-    };
-    checkAuth();
-  }, []);
-
-  const login = async (userData: User) => {
-    await authService.login(userData);
-    const { password, ...safeUser } = userData;
-    setUser(safeUser);
-  };
-
-  const register = async (userData: User) => {
-    await authService.register(userData);
-  };
-
-  const logout = async () => {
-    await authService.logout();
-    setUser(null);
-  };
-
-  return {
-    user,
-    isLoggedIn: !!user,
-    loading,
-    login,
-    register,
-    logout,
-  };
-}
-
+/**
+ * Thin selector over the auth store, preserving the shape screens already
+ * consume: `{ user, isLoggedIn, loading, login, register, logout }`.
+ */
 export function useAuth() {
-  const context = useContext(AuthContext);
-  if (context === undefined) {
-    throw new Error("useAuth must be used within an AuthProvider");
-  }
-  return context;
+  const user = useAuthStore((s) => s.user);
+  const hasHydrated = useAuthStore((s) => s.hasHydrated);
+  const login = useAuthStore((s) => s.login);
+  const register = useAuthStore((s) => s.register);
+  const logout = useAuthStore((s) => s.logout);
+
+  return useMemo(
+    () => ({
+      user,
+      isLoggedIn: !!user,
+      loading: !hasHydrated,
+      login,
+      register,
+      logout,
+    }),
+    [user, hasHydrated, login, register, logout],
+  );
 }

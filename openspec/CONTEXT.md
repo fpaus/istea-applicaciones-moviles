@@ -35,22 +35,21 @@ There is **no remote server or API**. All state lives on the device via
 
 ## 3. Architecture
 
-Layered, with dependency injection at the service layer and React Context for
-state distribution. Dependencies point downward only.
+Layered, with Zustand stores for global state and persistence. Dependencies
+point downward only.
 
 ```
 UI  (app/* — Expo Router screens & layouts)
   │
-hooks  (useAuth, useReminders, useNotifications)   ← components consume only these
+hooks  (useAuth, useReminders, useNotificationBridge, useHydrated)  ← components consume only these
   │
-providers  (React Context: AuthProvider, RemindersProvider)
+stores  (Zustand: useAuthStore, useReminderStore)
+  │   persist middleware ─► AsyncStorage         (state + persistence)
+  │   reminder actions ─► NotificationService (injected dependency)
   │
-services  (singletons, constructor-injected)
-  │   AuthService ─┐
-  │   RemindersService ─┼─► StorageService (AsyncStorage)
-  │   NotificationService ─► expo-notifications
+services  (NotificationService — OS side-effects only) ─► expo-notifications
   │
-types  (src/types/index.ts: Reminder, Time, User)
+types  (src/types/index.ts: Reminder, Time, User, NewReminder)
 ```
 
 ### Conventions (enforced)
@@ -58,12 +57,19 @@ types  (src/types/index.ts: Reminder, Time, User)
 - **Declarative auth guards.** Each route group's `_layout.tsx` returns
   `<Redirect>` based on `useAuth()` — never imperative `router.replace()` in an
   effect. (This avoids the "navigate before Root Layout mounted" crash.)
-- **Services are classes** with constructor injection, exported as ready-made
-  **singletons** (e.g. `export const remindersService = new RemindersService(...)`).
-- **All persistence goes through `StorageService`** — never call AsyncStorage
-  directly from providers, hooks, or components.
+- **Persistence is owned by the stores.** Each Zustand store uses the `persist`
+  middleware (AsyncStorage) — never call AsyncStorage directly from hooks,
+  components, or services.
+- **Stores own state + orchestration.** Side-effects (notifications) are called
+  inline from store actions via an **injected** `NotificationService`, keeping the
+  store unit-testable. The OS→store direction (a fired notification) is wired by
+  the `useNotificationBridge` event hook.
+- **Stores expose a tiny testable seam.** Each store is built by a factory over a
+  state initializer (`createReminderState` / `createAuthState`) so tests construct
+  a non-persisted store with fakes; the app wraps it in `persist`.
 - **Hooks hold logic; components stay presentational.** Components consume hooks
-  (`useReminders`, `useAuth`, `useNotifications`), not services directly.
+  (`useReminders`, `useAuth`), which are thin selectors over the stores — not the
+  stores or services directly.
 
 ## 4. Domain model
 
@@ -88,21 +94,22 @@ interface User   { email: string; password?: string; }      // password omitted 
 
 ### AsyncStorage keys
 
+Written by each store's `persist` middleware (JSON-serialized store state):
+
 | Key | Holds |
 | --- | --- |
-| `@auth_users_list` | array of registered `User` (email + password) |
-| `@auth_user` | current session `User` (password stripped) |
-| `@notifications_reminders` | array of `Reminder` |
+| `auth-store` | `{ user, users }` — session user (password stripped) + the on-device registry (email + password) |
+| `reminder-store` | `{ reminders }` — array of `Reminder` |
 
 ## 5. Current features (as built)
 
 ### Authentication (local, on-device)
-- **Register** (`AuthService.register`): rejects duplicate email; appends to
-  `@auth_users_list`.
-- **Login** (`AuthService.login`): validates email + password against the list;
-  stores the session (password stripped) under `@auth_user`.
-- **Logout**: clears `@auth_user`.
-- Session restored on launch via `useProvideAuth` → `AuthService.getUser`.
+- **Register** (`useAuthStore.register`): rejects duplicate email; appends to the
+  store's `users` registry.
+- **Login** (`useAuthStore.login`): validates email + password against `users`;
+  sets the session `user` (password stripped).
+- **Logout**: clears the session `user` (keeps the registry).
+- Session restored on launch by the auth store's `persist` rehydration.
 - Screens: `(auth)/login.tsx`, `(auth)/register.tsx`. Register auto-logs-in.
 
 ### Reminders
@@ -124,18 +131,29 @@ interface User   { email: string; password?: string; }      // password omitted 
   - `repeats === true` → `DAILY` trigger at `time.hour:time.minute`.
   - `repeats === false` → one-shot `DATE` trigger at the next occurrence of
     that time (today if still in the future, else tomorrow).
-- A received-notification listener (`RemindersProvider` → `useNotifications`)
-  clears the `notificationId` of the matching reminder when it fires.
+- A received-notification listener (`useNotificationBridge`, subscribed via
+  `NotificationService.addNotificationReceivedListener`) clears the
+  `notificationId` of the matching reminder when it fires.
 
-### Mock data / bootstrap
-- On launch, `app/_layout.tsx` runs `seedMockData()` and blocks render until done.
-- Seeds **10 mock users** (e.g. `admin@example.com` / `admin`; others use
-  `password123`) and **25 mock reminders** (mixed completed / recurring) only
-  when storage is empty.
+### Global state (Zustand)
+- Two persisted stores: `useAuthStore` (session `user` + `users` registry) and
+  `useReminderStore` (`reminders` + add/delete/markCompleted/clearAll).
+- Each uses the `persist` middleware (AsyncStorage), syncing on every change and
+  rehydrating on launch. Reminder actions call an **injected** `NotificationService`
+  inline and write the returned `notificationId` back in the same update.
+- Built via factories over a state initializer (`createAuthState` /
+  `createReminderState`) for unit-testability; `useAuth` / `useReminders` are thin
+  selectors over the stores.
+
+### App bootstrap
+- No mock seeding. The app starts empty; a user must **register before they can
+  log in**.
+- `app/_layout.tsx` mounts `useNotificationBridge` and renders nothing until
+  `useHydrated()` reports both stores have rehydrated (the hydration gate).
 
 ### Routing structure
 ```
-app/_layout.tsx          seed gate → AuthProvider → RemindersProvider → Stack
+app/_layout.tsx          hydration gate (useHydrated) + useNotificationBridge → Stack
   (app)/_layout.tsx      Drawer; <Redirect href="/login"> if not logged in
     index.tsx            dashboard (Active / Completed) + FAB
     add.tsx              create reminder (hidden from drawer)
@@ -161,10 +179,13 @@ touches the affected area:
   field is **planned for removal** (see Planned features) — login will become
   email-only — so hardening password security (hashing, etc.) is **not** a goal.
 - **No edit flow.** Reminders can be created, completed, or deleted — not edited.
-- **No tests yet.** No Jest / React Native Testing Library setup is in place
-  despite the test-first philosophy (see config rules); establishing it is
-  early planned work.
-- **Mock seeding always runs on first launch** and gates the UI.
+- **Test coverage is partial.** A Jest + React Native Testing Library harness is in
+  place (`npm test`) with unit tests for the stores and hooks; screen/integration
+  coverage is not built out yet. Note: RNTL is pinned to `13.2.0` with
+  `react-test-renderer@19.1.0` to match Expo SDK 54's `react@19.1.0` (RNTL 14
+  requires `react@19.2`).
+- **No seeded data.** The app starts empty (seeding was removed); first use
+  requires registering an account before logging in.
 
 ## 7. Planned / future features (intended direction)
 
@@ -182,5 +203,6 @@ touches the affected area:
   of the current password flow.
 - **Atomic Design component structure** — reorganize UI into
   `Components/Atoms`, `Components/Molecules`, `Components/Organisms`.
-- **Test suite** — Jest + React Native Testing Library, driving a TDD/BDD
+- **Broader test coverage** — the Jest + RNTL harness and store/hook unit tests
+  now exist; extend toward screen/integration coverage, continuing the TDD/BDD
   (Red-Green-Refactor) workflow per the project rules.

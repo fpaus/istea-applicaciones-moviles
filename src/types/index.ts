@@ -3,6 +3,18 @@ export interface Time {
   minute: number;
 }
 
+export interface User {
+  email: string;
+  password?: string;
+}
+
+export interface NewReminder {
+  title: string;
+  description: string;
+  time: Time;
+  repeats: boolean;
+}
+
 export interface Reminder {
   id: string;
   title: string;

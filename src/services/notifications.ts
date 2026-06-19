@@ -100,6 +100,12 @@ export class NotificationService {
   ) {
     return Notifications.addNotificationReceivedListener(callback);
   }
+
+  addNotificationResponseReceivedListener(
+    callback: (response: Notifications.NotificationResponse) => void,
+  ) {
+    return Notifications.addNotificationResponseReceivedListener(callback);
+  }
 }
 
 export const notificationService = new NotificationService();
