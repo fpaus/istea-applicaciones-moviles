@@ -99,4 +99,43 @@ describe("useProjectActions", () => {
 
     expect(renameSpy).toHaveBeenCalledWith("p1", "Personal");
   });
+
+  it("deleteProject shows appropriate dialog message when project has 0 tasks", () => {
+    useTaskStore.setState({ tasks: { p1: [] } });
+    const alertSpy = jest.spyOn(Alert, "alert");
+
+    const { result } = renderHook(() => useProjectActions());
+    act(() => {
+      result.current.deleteProject("p1", "Trabajo");
+    });
+
+    expect(alertSpy).toHaveBeenCalledTimes(1);
+    const message = `${alertSpy.mock.calls[0][0]} ${alertSpy.mock.calls[0][1]}`;
+    expect(message).toContain("Trabajo");
+    expect(message).not.toContain("tarea");
+    alertSpy.mockRestore();
+  });
+
+  it("deleteProject shows appropriate dialog message when project has multiple tasks and when name is omitted", () => {
+    useTaskStore.setState({
+      tasks: {
+        p1: [
+          { id: "t1", title: "x", description: "", notification: null, completed: false, createdAt: 0 },
+          { id: "t2", title: "y", description: "", notification: null, completed: false, createdAt: 1 },
+        ],
+      },
+    });
+    const alertSpy = jest.spyOn(Alert, "alert");
+
+    const { result } = renderHook(() => useProjectActions());
+    act(() => {
+      result.current.deleteProject("p1"); // Name omitted
+    });
+
+    expect(alertSpy).toHaveBeenCalledTimes(1);
+    const message = `${alertSpy.mock.calls[0][0]} ${alertSpy.mock.calls[0][1]}`;
+    expect(message).toContain("este proyecto");
+    expect(message).toContain("sus 2 tareas");
+    alertSpy.mockRestore();
+  });
 });

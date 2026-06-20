@@ -5,6 +5,7 @@ import { notificationService } from "../services/notifications";
 import { Task } from "../types";
 import { TaskDeps, TaskState } from "./types";
 import { generateUUID } from "../utils/uuid";
+import { descendants, completeTask, reopenTask, ancestors } from "../utils/tasks-cascade";
 
 const STORAGE_KEY = "task-store";
 
@@ -42,6 +43,13 @@ export function selectCompleted(tasks: Task[]): Task[] {
   return tasks.filter((t) => t.completed);
 }
 
+function isFutureTime(time: { hour: number; minute: number }): boolean {
+  const now = new Date();
+  const currentTotal = now.getHours() * 60 + now.getMinutes();
+  const timeTotal = time.hour * 60 + time.minute;
+  return timeTotal > currentTotal;
+}
+
 /**
  * The testable seam: a state initializer parameterized by its side-effect
  * dependency. Tests build a non-persisted store from this; the app wraps it in
@@ -62,6 +70,67 @@ export const createTaskState =
       }
     };
 
+    const performReopen = async (
+      projectTasks: Task[],
+      targetId: string,
+      projName?: string,
+    ): Promise<Task[]> => {
+      const target = projectTasks.find((t) => t.id === targetId);
+      if (!target) return projectTasks;
+
+      const ancList = ancestors(projectTasks, targetId);
+      const affectedTasks = [target, ...ancList];
+
+      const newNotifIds: Record<string, string | null> = {};
+
+      for (const t of affectedTasks) {
+        if (t.completed && t.notification) {
+          const repeats = t.notification.repeats;
+          const isFuture = isFutureTime(t.notification.time);
+
+          if (repeats || isFuture) {
+            try {
+              const isSubtask = !!t.parentId;
+              const displayTitle =
+                projName && !isSubtask
+                  ? `[${projName}] ${t.title}`
+                  : t.title;
+
+              const newId = await deps.notifications.scheduleNotification(
+                displayTitle,
+                t.description,
+                t.notification.time,
+                repeats,
+              );
+              newNotifIds[t.id] = newId;
+            } catch (error) {
+              console.error(
+                "[task-store] Failed to reschedule notification on reopen:",
+                error,
+              );
+              newNotifIds[t.id] = null;
+            }
+          } else {
+            newNotifIds[t.id] = null;
+          }
+        }
+      }
+
+      const reopenedList = reopenTask(projectTasks, targetId);
+
+      return reopenedList.map((t) => {
+        if (t.id in newNotifIds) {
+          return {
+            ...t,
+            notification: t.notification
+              ? { ...t.notification, notificationId: newNotifIds[t.id] }
+              : null,
+          };
+        }
+        return t;
+      });
+    };
+
     return {
     tasks: {},
     hasHydrated: false,
@@ -74,7 +143,8 @@ export const createTaskState =
       let notificationId: string | null = null;
       if (data.notification) {
         try {
-          const displayTitle = projectName
+          const isSubtask = !!data.parentId;
+          const displayTitle = projectName && !isSubtask
             ? `[${projectName}] ${data.title}`
             : data.title;
           notificationId = await deps.notifications.scheduleNotification(
@@ -104,13 +174,23 @@ export const createTaskState =
           : null,
         completed: false,
         createdAt: Date.now(),
+        parentId: data.parentId ?? null,
       };
 
       const projectTasks = get().tasks[projectId] || [];
+      let updatedTasks = [newTask, ...projectTasks];
+
+      if (data.parentId) {
+        const parent = projectTasks.find((t) => t.id === data.parentId);
+        if (parent?.completed) {
+          updatedTasks = await performReopen(updatedTasks, data.parentId, projectName);
+        }
+      }
+
       set({
         tasks: {
           ...get().tasks,
-          [projectId]: [newTask, ...projectTasks],
+          [projectId]: updatedTasks,
         },
       });
     },
@@ -118,11 +198,19 @@ export const createTaskState =
     deleteTask: async (projectId, id) => {
       const projectTasks = get().tasks[projectId] || [];
       const item = projectTasks.find((t) => t.id === id);
-      await safeCancel(item?.notification?.notificationId ?? null);
+
+      const subDesc = item ? descendants(projectTasks, id) : [];
+      const itemsToDelete = item ? [item, ...subDesc] : [];
+      const deleteIds = new Set(itemsToDelete.map((t) => t.id));
+
+      for (const t of itemsToDelete) {
+        await safeCancel(t.notification?.notificationId ?? null);
+      }
+
       set({
         tasks: {
           ...get().tasks,
-          [projectId]: projectTasks.filter((t) => t.id !== id),
+          [projectId]: projectTasks.filter((t) => !deleteIds.has(t.id)),
         },
       });
     },
@@ -262,13 +350,32 @@ export const createTaskState =
     markCompleted: async (projectId, id) => {
       const projectTasks = get().tasks[projectId] || [];
       const item = projectTasks.find((t) => t.id === id);
-      await safeCancel(item?.notification?.notificationId ?? null);
+      if (item) {
+        const descList = descendants(projectTasks, id);
+        const affectedTasks = [item, ...descList];
+
+        for (const t of affectedTasks) {
+          if (t.notification?.notificationId) {
+            await safeCancel(t.notification.notificationId);
+          }
+        }
+      }
+
       set({
         tasks: {
           ...get().tasks,
-          [projectId]: projectTasks.map((t) =>
-            t.id === id ? { ...t, completed: true, notification: null } : t,
-          ),
+          [projectId]: completeTask(projectTasks, id),
+        },
+      });
+    },
+
+    reopenTask: async (projectId, id, projectName) => {
+      const projectTasks = get().tasks[projectId] || [];
+      const updatedList = await performReopen(projectTasks, id, projectName);
+      set({
+        tasks: {
+          ...get().tasks,
+          [projectId]: updatedList,
         },
       });
     },
@@ -339,9 +446,9 @@ export const createTaskStore = (
         partialize: (state) => ({ tasks: state.tasks }),
         merge: (persistedState, currentState) => ({
           ...currentState,
-          tasks: (persistedState as any)?.tasks || {},
+          tasks: (persistedState as Partial<TaskState>)?.tasks ?? {},
         }),
-        onRehydrateStorage: () => (state) => state?.setHasHydrated(true),
+        onRehydrateStorage: () => (state) => state?.setHasHydrated?.(true),
       }),
       { name: "TaskStore" },
     ),

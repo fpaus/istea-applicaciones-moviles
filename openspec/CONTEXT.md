@@ -41,7 +41,7 @@ point downward only.
 UI  (app/* — Expo Router screens & layouts)
   │
 hooks  (view-model: useDashboard, useAddTaskForm, useProjectSelector, useNotificationPermission;
-        data/actions: useProject, useActiveTasks, useCompletedTasks, useTaskActions;
+        data/actions: useProject, useActiveTasks, useCompletedTasks, useTaskActions, useTaskCompletion;
         app-wiring: useNotificationBridge, useHydrated)  ← components consume only these
   │
 stores  (Zustand: useProjectStore, useTaskStore)
@@ -50,7 +50,7 @@ stores  (Zustand: useProjectStore, useTaskStore)
   │
 services  (NotificationService — OS side-effects only) ─► expo-notifications
   │
-utils  (src/utils/uuid.ts — generateUUID environment-agnostic UUIDs)
+utils  (src/utils/uuid.ts, src/utils/tasks-cascade.ts — generateUUID, cascade helpers)
   │
 types  (src/types/index.ts: Task, Time, Project, NewTask)
 ```
@@ -115,8 +115,8 @@ interface Task {
     notificationId: string | null; // scheduled OS notification id (null once fired/completed)
   } | null;
   completed: boolean;
-
   createdAt: number;          // epoch ms
+  parentId?: string | null;   // parent task ID (null/absent for root tasks)
 }
 ```
 
@@ -143,14 +143,13 @@ Written by each store's `persist` middleware (JSON-serialized store state):
 
 ### Tasks
 - **Create** (`add.tsx`): title, optional description, and an optional reminder toggle ("Agregar recordatorio"). When toggled, time (hour 0–23 / minute 0–59 via `NumberInput`) and a **"Repeat Daily"** switch are configured. Save is disabled until title is provided (and time when reminder is toggled on).
-- **Edit** (`edit.tsx`): edit title, description, and reminder. Reuses form inputs and toggle. Diff-reconciles notifications inline.
+- **Edit / Detail / Subtree** (`edit.tsx`): edit title, description, and reminder. It also displays a recursive subtree of its subtasks, allows adding subtasks inline under this task, and displays direct-children progress indicators.
 - **List / dashboard** (`(app)/index.tsx`): `SectionList` split into
   **Active Tasks** (not completed, sorted by next upcoming time-of-day for timed tasks, followed by reminder-less tasks ordered by `createdAt`) and
-  **Completed**. FAB routes to the add screen. Renders `ProjectSelector` inline
-  if `currentProject` is null.
-- **Complete** (`markCompleted`): marks done and cancels its scheduled
-  notification (`notificationId → null`).
-- **Delete**: removes the task and cancels its notification.
+  **Completed**. Shows **root tasks only** (no `parentId`); each root with children renders a direct-children completion progress indicator.
+- **Complete** (`markCompleted`): governed by a completion invariant (**completed parent ⟹ all descendants completed**). Completing a task with incomplete descendants pops a Spanish confirmation dialog to complete all descendants; completing the last open child prompts to complete the parent task. Cancels OS notifications for the completed subtree (`notificationId → null` inline inside `notification` to preserve settings).
+- **Re-open** (`reopenTask`): cascades up to re-open all parent/ancestor tasks to preserve the completion invariant. Reschedules reminders for re-opened tasks (repeats always; future one-shot only; past one-shot skipped). Adding an incomplete child task to a completed parent automatically triggers this ancestor re-open.
+- **Delete**: cascade deletes the task and all of its descendants, cancelling all of their scheduled notifications.
 - **Clear all** (`clearAll`): wipes all tasks inside the active project and cancels their notifications.
 
 ### Notifications (local)
@@ -237,4 +236,6 @@ The following architectural and design decisions were made during the refactorin
 - **Separation of Read-only and Actionable Hooks**: The hook layer is split into fine-grained task list hooks (`useActiveTasks()`, `useCompletedTasks()`) and a mutation hook (`useTaskActions()`). This ensures that screens only dispatching actions (e.g., the add task screen) do not subscribe to list changes, preventing unnecessary renders.
 - **Interactive Notification Permission Check**: The application queries OS permission status before rendering the dashboard and displays an inline interactive warning banner if notifications are disabled, allowing the user to request permission directly.
 - **Destructive Confirmation Interceptors**: Destructive hook actions (like `clearAll`) are intercepted by native confirmation alerts before executing store mutations to prevent accidental data loss.
+- **Hierarchical Tasks via Flat Array**: Decouples the hierarchical UI structure from the storage format by keeping all tasks in a flat list per project and deriving parent-child connections in-memory using pure traversal helpers (`descendants`, `ancestors`, `childrenOf`).
+- **Resilient Multi-Task Cascades**: Invariants of completion and deletion are calculated cleanly in pure transforms, and their associated OS notifications are reconciled in bulk inline with robust failure containment (failures in scheduling/cancelling one task do not abort the overall mutation or corrupt state).
 

@@ -1,12 +1,23 @@
 import { useCallback, useState } from "react";
 import { useProjectActions } from "./useProjectActions";
 
+export interface UseProjectManagerResult {
+  editingId: string | null;
+  editingName: string;
+  error: string;
+  startEdit: (id: string, name: string) => void;
+  changeEditName: (text: string) => void;
+  cancelEdit: () => void;
+  submitEdit: () => Promise<void>;
+  deleteProject: (id: string, name?: string) => void;
+}
+
 /**
  * Encapsulates the per-row "manage projects" UI state for the picker: inline
  * rename editing (with validation/error copy in Spanish) and delete (cascade +
  * confirmation, via {@link useProjectActions}). Keeps the picker presentational.
  */
-export function useProjectManager() {
+export function useProjectManager(): UseProjectManagerResult {
   const { deleteProject, renameProject } = useProjectActions();
 
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -41,11 +52,12 @@ export function useProjectManager() {
       setEditingId(null);
       setEditingName("");
       setError("");
-    } catch (e: any) {
+    } catch (e: unknown) {
+      const errorMsg = e instanceof Error ? e.message : String(e);
       setError(
-        e?.message === "Project already exists"
+        errorMsg === "Project already exists"
           ? "Ya existe un proyecto con ese nombre"
-          : e?.message || "Error al renombrar el proyecto",
+          : errorMsg || "Error al renombrar el proyecto",
       );
     }
   }, [editingId, editingName, renameProject]);

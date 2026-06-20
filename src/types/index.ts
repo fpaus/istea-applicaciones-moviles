@@ -12,6 +12,7 @@ export interface NewTask {
   title: string;
   description: string;
   notification?: { time: Time; repeats: boolean; notificationId: string | null } | null;
+  parentId?: string | null;
 }
 
 export interface Task {
@@ -21,4 +22,5 @@ export interface Task {
   notification?: { time: Time; repeats: boolean; notificationId: string | null } | null;
   completed: boolean;
   createdAt: number;
+  parentId?: string | null;
 }

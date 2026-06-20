@@ -68,4 +68,32 @@ describe("useProjectManager", () => {
     expect(result.current.error).toMatch(/requerido/i);
     expect(result.current.editingId).toBe("p1");
   });
+
+  it("submitEdit returns early if editingId is null", async () => {
+    const { result } = renderHook(() => useProjectManager());
+
+    await act(async () => {
+      await result.current.submitEdit();
+    });
+
+    expect(result.current.error).toBe("");
+  });
+
+  it("submitEdit handles generic error when rename fails", async () => {
+    const { result } = renderHook(() => useProjectManager());
+
+    // Mock renameProject to throw a generic error
+    const renameProjectSpy = jest.spyOn(useProjectStore.getState(), "renameProject").mockRejectedValue(new Error("Generic DB error"));
+
+    act(() => result.current.startEdit("p1", "Trabajo"));
+    act(() => result.current.changeEditName("Proyecto Fallido"));
+    await act(async () => {
+      await result.current.submitEdit();
+    });
+
+    expect(result.current.error).toBe("Generic DB error");
+    expect(result.current.editingId).toBe("p1");
+
+    renameProjectSpy.mockRestore();
+  });
 });

@@ -36,6 +36,11 @@ export interface TaskState {
     projectName?: string,
   ) => Promise<void>;
   markCompleted: (projectId: string, id: string) => Promise<void>;
+  reopenTask: (
+    projectId: string,
+    id: string,
+    projectName?: string,
+  ) => Promise<void>;
   clearAll: (projectId: string) => Promise<void>;
   /**
    * Cascade target for project deletion: cancels every task's notification and

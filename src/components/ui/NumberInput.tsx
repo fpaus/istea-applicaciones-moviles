@@ -1,5 +1,5 @@
 import React from "react";
-import { TextInputProps } from "react-native";
+import { BlurEvent, TextInputProps } from "react-native";
 import { Input } from "./Input";
 
 interface NumberInputProps extends Omit<TextInputProps, "onChangeText" | "value"> {
@@ -20,7 +20,7 @@ export function NumberInput({
   onChangeNumber,
   onBlur,
   ...props
-}: NumberInputProps) {
+}: NumberInputProps): React.JSX.Element {
   const handleChange = (text: string) => {
     // Only allow numeric characters
     let cleaned = text.replace(/[^0-9]/g, "");
@@ -40,7 +40,7 @@ export function NumberInput({
     onChangeNumber(parsed);
   };
 
-  const handleBlur = (e: any) => {
+  const handleBlur = (e: BlurEvent) => {
     if (value !== null) {
       let parsed = value;
       let clamped = false;

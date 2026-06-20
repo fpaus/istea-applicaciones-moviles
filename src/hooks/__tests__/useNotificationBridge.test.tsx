@@ -3,8 +3,8 @@ import { useTaskStore } from "../../stores/task-store";
 import { useNotificationBridge } from "../useNotificationBridge";
 
 const mockState: {
-  receivedListener: ((notification: any) => void) | null;
-  responseListener: ((response: any) => void) | null;
+  receivedListener: ((notification: unknown) => void) | null;
+  responseListener: ((response: unknown) => void) | null;
 } = {
   receivedListener: null,
   responseListener: null,
@@ -13,11 +13,11 @@ const mockRemove = jest.fn();
 
 jest.mock("../../services/notifications", () => ({
   notificationService: {
-    addNotificationReceivedListener: (cb: (n: any) => void) => {
+    addNotificationReceivedListener: (cb: (n: unknown) => void) => {
       mockState.receivedListener = cb;
       return { remove: mockRemove };
     },
-    addNotificationResponseReceivedListener: (cb: (r: any) => void) => {
+    addNotificationResponseReceivedListener: (cb: (r: unknown) => void) => {
       mockState.responseListener = cb;
       return { remove: mockRemove };
     },
@@ -59,7 +59,7 @@ describe("useNotificationBridge", () => {
     expect(mockState.receivedListener).toBeInstanceOf(Function);
 
     act(() => {
-      mockState.receivedListener!({ request: { identifier: "n1" } });
+      mockState.receivedListener?.({ request: { identifier: "n1" } });
     });
 
     expect(useTaskStore.getState().tasks["project-1"][0].notification?.notificationId).toBeNull();
@@ -71,7 +71,7 @@ describe("useNotificationBridge", () => {
     expect(mockState.responseListener).toBeInstanceOf(Function);
 
     act(() => {
-      mockState.responseListener!({
+      mockState.responseListener?.({
         notification: { request: { identifier: "n1" } },
       });
     });

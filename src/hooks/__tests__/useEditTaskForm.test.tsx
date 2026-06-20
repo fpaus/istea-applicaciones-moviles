@@ -183,4 +183,87 @@ describe("useEditTaskForm", () => {
     expect(mockBack).toHaveBeenCalledTimes(1);
     updateTaskSpy.mockRestore();
   });
+
+  it("returns early if oldTask is not found", async () => {
+    const updateTaskSpy = jest.spyOn(useTaskStore.getState(), "updateTask");
+    const { result } = renderHook(() => useEditTaskForm("p1", "non-existent"));
+
+    await act(async () => {
+      await result.current.handleSave();
+    });
+
+    expect(updateTaskSpy).not.toHaveBeenCalled();
+    expect(mockBack).not.toHaveBeenCalled();
+    updateTaskSpy.mockRestore();
+  });
+
+  it("returns early if validation checks fail during save call", async () => {
+    const updateTaskSpy = jest.spyOn(useTaskStore.getState(), "updateTask");
+    const { result } = renderHook(() => useEditTaskForm("p1", "t1"));
+
+    // Force invalid title
+    act(() => {
+      result.current.setTitle("");
+    });
+    await act(async () => {
+      await result.current.handleSave();
+    });
+    expect(updateTaskSpy).not.toHaveBeenCalled();
+    expect(mockBack).not.toHaveBeenCalled();
+
+    // Reset title, force invalid reminder time
+    act(() => {
+      result.current.setTitle("Valid Title");
+      result.current.setHasReminder(true);
+      result.current.setHour(null);
+    });
+    await act(async () => {
+      await result.current.handleSave();
+    });
+    expect(updateTaskSpy).not.toHaveBeenCalled();
+    expect(mockBack).not.toHaveBeenCalled();
+
+    updateTaskSpy.mockRestore();
+  });
+
+  it("updates description and ignores no-reminder when it was already none", async () => {
+    // Task with no reminder
+    useTaskStore.setState({
+      tasks: {
+        p1: [
+          {
+            id: "t3",
+            title: "Task 3",
+            description: "Old description",
+            notification: null,
+            completed: false,
+            createdAt: 100,
+          },
+        ],
+      },
+    });
+
+    const updateTaskSpy = jest.spyOn(useTaskStore.getState(), "updateTask");
+    const { result } = renderHook(() => useEditTaskForm("p1", "t3"));
+
+    act(() => {
+      result.current.setDescription("New description");
+    });
+
+    await act(async () => {
+      await result.current.handleSave();
+    });
+
+    // Check that we only patched description (no notification: null since it was already null)
+    expect(updateTaskSpy).toHaveBeenCalledWith(
+      "p1",
+      "t3",
+      {
+        description: "New description",
+      },
+      "Work"
+    );
+    expect(mockBack).toHaveBeenCalledTimes(1);
+    updateTaskSpy.mockRestore();
+  });
 });

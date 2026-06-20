@@ -4,10 +4,17 @@ import { useProjectStore } from "../stores/project-store";
 import { useTaskStore } from "../stores/task-store";
 import { NewTask } from "../types";
 
+export interface UseTaskActionsResult {
+  addTask: (data: NewTask) => Promise<void>;
+  deleteTask: (id: string) => void;
+  markCompleted: (id: string) => Promise<void>;
+  clearAll: () => void;
+}
+
 /**
  * Exposes actionable task mutations scoped to the current project.
  */
-export function useTaskActions() {
+export function useTaskActions(): UseTaskActionsResult {
   const currentProject = useProjectStore((s) => s.currentProject);
   const projectId = currentProject?.id || "";
   const projectName = currentProject?.name ?? "";

@@ -1,17 +1,86 @@
+import { CardItem } from "@/src/components/CardItem";
 import { Button } from "@/src/components/ui/Button";
 import { Input } from "@/src/components/ui/Input";
 import { NumberInput } from "@/src/components/ui/NumberInput";
 import { Typography } from "@/src/components/ui/Typography";
 import { Colors, Utility } from "@/src/constants/theme";
 import { useEditTaskForm } from "@/src/hooks/useEditTaskForm";
-import { useLocalSearchParams } from "expo-router";
+import { useTaskActions } from "@/src/hooks/useTaskActions";
+import { useTaskCompletion } from "@/src/hooks/useTaskCompletion";
+import { useTaskStore } from "@/src/stores/task-store";
+import { Task } from "@/src/types";
+import { useLocalSearchParams, useRouter } from "expo-router";
+import React, { useCallback, useRef, useState } from "react";
 import { ScrollView, StyleSheet, Switch, View } from "react-native";
 
-export default function EditScreen() {
-  const { projectId, taskId } = useLocalSearchParams<{
+const EMPTY_TASKS: Task[] = [];
+
+interface SubtreeNodeProps {
+  taskId: string;
+  projectId: string;
+  depth: number;
+}
+
+function SubtreeNode({ taskId, projectId, depth }: SubtreeNodeProps): React.JSX.Element | null {
+  const projectTasks = useTaskStore(
+    useCallback((s) => s.tasks[projectId] ?? EMPTY_TASKS, [projectId])
+  );
+  const { deleteTask } = useTaskActions();
+  const { completeTask, reopenTask } = useTaskCompletion();
+  const router = useRouter();
+
+  const children = projectTasks.filter((t) => t.parentId === taskId);
+  if (children.length === 0) return null;
+
+  const cappedPadding = depth >= 3 ? 0 : 12;
+  const showLine = depth < 3;
+
+  return (
+    <View
+      style={[
+        { paddingLeft: cappedPadding },
+        showLine && {
+          borderLeftWidth: 1.5,
+          borderLeftColor: "#CBD5E1",
+          marginLeft: 6,
+        },
+      ]}
+    >
+      {children.map((child) => {
+        const childSubtasks = projectTasks.filter((t) => t.parentId === child.id);
+        const childTotal = childSubtasks.length;
+        const childCompleted = childSubtasks.filter((t) => t.completed).length;
+
+        return (
+          <View key={child.id} style={{ marginTop: 8 }}>
+            <CardItem
+              item={child}
+              onMarkCompleted={child.completed ? reopenTask : completeTask}
+              onDelete={deleteTask}
+              onEdit={(id) => {
+                router.push({
+                  pathname: "/edit",
+                  params: { projectId, taskId: id },
+                });
+              }}
+              childrenCount={childTotal}
+              completedChildrenCount={childCompleted}
+            />
+            <SubtreeNode taskId={child.id} projectId={projectId} depth={depth + 1} />
+          </View>
+        );
+      })}
+    </View>
+  );
+}
+
+export default function EditScreen(): React.JSX.Element {
+  const { projectId = "", taskId = "" } = useLocalSearchParams<{
     projectId: string;
     taskId: string;
   }>();
+
+  const scrollViewRef = useRef<ScrollView>(null);
 
   const {
     title,
@@ -28,10 +97,62 @@ export default function EditScreen() {
     setRepeats,
     isFormValid,
     handleSave,
-  } = useEditTaskForm(projectId || "", taskId || "");
+  } = useEditTaskForm(projectId, taskId);
+
+  const projectTasks = useTaskStore(
+    useCallback((s) => s.tasks[projectId] ?? EMPTY_TASKS, [projectId])
+  );
+
+  const directChildren = projectTasks.filter((t) => t.parentId === taskId);
+  const totalChildren = directChildren.length;
+  const completedChildren = directChildren.filter((t) => t.completed).length;
+
+  // Local state for the subtask form
+  const [subTitle, setSubTitle] = useState("");
+  const [subDesc, setSubDesc] = useState("");
+  const [subHasReminder, setSubHasReminder] = useState(false);
+  const [subHour, setSubHour] = useState<number | null>(null);
+  const [subMinute, setSubMinute] = useState<number | null>(null);
+  const [subRepeats, setSubRepeats] = useState(false);
+
+  const { addTask } = useTaskActions();
+
+  const isSubtaskFormValid =
+    subTitle.trim().length > 0 &&
+    (!subHasReminder || (subHour !== null && subMinute !== null));
+
+  const handleAddSubtask = async (): Promise<void> => {
+    if (!isSubtaskFormValid) return;
+
+    await addTask({
+      title: subTitle,
+      description: subDesc,
+      notification: subHasReminder && subHour !== null && subMinute !== null
+        ? {
+            time: { hour: subHour, minute: subMinute },
+            repeats: subRepeats,
+            notificationId: null,
+          }
+        : null,
+      parentId: taskId,
+    });
+
+    // Reset Form
+    setSubTitle("");
+    setSubDesc("");
+    setSubHasReminder(false);
+    setSubHour(null);
+    setSubMinute(null);
+    setSubRepeats(false);
+
+    // Auto-scroll to bottom
+    setTimeout(() => {
+      scrollViewRef.current?.scrollToEnd({ animated: true });
+    }, 100);
+  };
 
   return (
-    <ScrollView style={styles.container}>
+    <ScrollView ref={scrollViewRef} style={styles.container}>
       <Typography variant="h2" style={styles.title}>
         Editar Tarea
       </Typography>
@@ -99,6 +220,100 @@ export default function EditScreen() {
         style={styles.saveBtn}
         disabled={!isFormValid}
       />
+
+      {totalChildren > 0 && (
+        <View style={styles.currentTaskProgress}>
+          <Typography variant="caption" style={styles.progressText}>
+            Progreso de subtareas directas: {completedChildren} de {totalChildren} ({Math.round((completedChildren / totalChildren) * 100)}%)
+          </Typography>
+          <View style={styles.progressBarBg}>
+            <View
+              style={[
+                styles.progressBarFill,
+                { width: `${(completedChildren / totalChildren) * 100}%` },
+              ]}
+            />
+          </View>
+        </View>
+      )}
+
+      <View style={styles.divider} />
+
+      <Typography variant="h3" style={styles.sectionTitle}>
+        Subtareas
+      </Typography>
+
+      <SubtreeNode taskId={taskId} projectId={projectId} depth={0} />
+
+      <View style={styles.divider} />
+
+      <Typography variant="h3" style={styles.sectionTitle}>
+        Agregar Nueva Subtarea
+      </Typography>
+
+      <Input
+        label="Título de Subtarea"
+        placeholder="Ej.: Subtarea A"
+        value={subTitle}
+        onChangeText={setSubTitle}
+      />
+
+      <Input
+        label="Descripción de Subtarea"
+        placeholder="Detalles de la subtarea..."
+        value={subDesc}
+        onChangeText={setSubDesc}
+      />
+
+      <View style={styles.switchContainer}>
+        <Typography variant="body">Agregar recordatorio a subtarea</Typography>
+        <Switch
+          value={subHasReminder}
+          onValueChange={setSubHasReminder}
+          trackColor={{ true: Colors.light.primary }}
+        />
+      </View>
+
+      {subHasReminder && (
+        <>
+          <View style={styles.timeContainer}>
+            <NumberInput
+              label="Hora (0-23)"
+              placeholder="ej.: 14"
+              value={subHour}
+              onChangeNumber={setSubHour}
+              minValue={0}
+              maxValue={23}
+              style={styles.timeInput}
+            />
+            <NumberInput
+              label="Minuto (0-59)"
+              placeholder="ej.: 30"
+              value={subMinute}
+              onChangeNumber={setSubMinute}
+              minValue={0}
+              maxValue={59}
+              style={styles.timeInput}
+            />
+          </View>
+
+          <View style={styles.switchContainer}>
+            <Typography variant="body">Repetir recordatorio subtarea</Typography>
+            <Switch
+              value={subRepeats}
+              onValueChange={setSubRepeats}
+              trackColor={{ true: Colors.light.primary }}
+            />
+          </View>
+        </>
+      )}
+
+      <Button
+        title="Agregar Subtarea"
+        onPress={handleAddSubtask}
+        style={styles.addSubtaskBtn}
+        disabled={!isSubtaskFormValid}
+      />
     </ScrollView>
   );
 }
@@ -114,7 +329,7 @@ const styles = StyleSheet.create({
   },
   saveBtn: {
     marginTop: Utility.spacing.l,
-    marginBottom: Utility.spacing.xl,
+    marginBottom: Utility.spacing.m,
   },
   timeContainer: {
     flexDirection: "row",
@@ -128,5 +343,37 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "center",
     marginTop: Utility.spacing.m,
+  },
+  currentTaskProgress: {
+    marginTop: Utility.spacing.m,
+    marginBottom: Utility.spacing.m,
+  },
+  progressText: {
+    color: "#666",
+    marginBottom: Utility.spacing.xs,
+    fontSize: 12,
+  },
+  progressBarBg: {
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: "#E2E8F0",
+    overflow: "hidden",
+  },
+  progressBarFill: {
+    height: "100%",
+    borderRadius: 3,
+    backgroundColor: Colors.light.primary,
+  },
+  divider: {
+    height: 1,
+    backgroundColor: "#E2E8F0",
+    marginVertical: Utility.spacing.l,
+  },
+  sectionTitle: {
+    marginBottom: Utility.spacing.m,
+  },
+  addSubtaskBtn: {
+    marginTop: Utility.spacing.l,
+    marginBottom: Utility.spacing.xl,
   },
 });

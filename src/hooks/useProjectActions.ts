@@ -3,6 +3,11 @@ import { Alert } from "react-native";
 import { useProjectStore } from "../stores/project-store";
 import { useTaskStore } from "../stores/task-store";
 
+export interface UseProjectActionsResult {
+  deleteProject: (id: string, name?: string) => void;
+  renameProject: (id: string, name: string) => Promise<void>;
+}
+
 /**
  * Orchestrates project lifecycle actions that span both stores. Deletion
  * cascades to the project's tasks (cancelling their notifications) by calling
@@ -10,7 +15,7 @@ import { useTaskStore } from "../stores/task-store";
  * (no store imports another). Destructive deletion is gated behind a Spanish
  * confirmation dialog.
  */
-export function useProjectActions() {
+export function useProjectActions(): UseProjectActionsResult {
   const storeDeleteProject = useProjectStore((s) => s.deleteProject);
   const storeRenameProject = useProjectStore((s) => s.renameProject);
   const removeProjectTasks = useTaskStore((s) => s.removeProjectTasks);

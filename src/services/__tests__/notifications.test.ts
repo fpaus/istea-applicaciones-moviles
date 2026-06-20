@@ -193,5 +193,46 @@ describe("NotificationService.checkPermission", () => {
   });
 });
 
+describe("NotificationService when expo-notifications fails to load", () => {
+  it("fails gracefully without crashing and returns safe fallback values", async () => {
+    let IsolatedService: typeof NotificationService | undefined;
+    
+    jest.isolateModules(() => {
+      jest.unmock("expo-notifications");
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const mod = require("../notifications");
+      IsolatedService = mod.NotificationService;
+    });
+
+    if (!IsolatedService) {
+      throw new Error("IsolatedService is undefined");
+    }
+
+    const service = new IsolatedService();
+
+    const checked = await service.checkPermission();
+    expect(checked).toBe(false);
+
+    const requested = await service.requestPermission();
+    expect(requested).toBe(false);
+
+    const scheduled = await service.scheduleNotification("t", "b", { hour: 9, minute: 0 }, true);
+    expect(scheduled).toBeNull();
+
+    await expect(service.cancelNotification("123")).resolves.toBeUndefined();
+    await expect(service.cancelAllNotifications()).resolves.toBeUndefined();
+
+    const sub = service.addNotificationReceivedListener(() => {});
+    expect(sub).toBeDefined();
+    expect(typeof sub.remove).toBe("function");
+    sub.remove();
+
+    const subResp = service.addNotificationResponseReceivedListener(() => {});
+    expect(subResp).toBeDefined();
+    expect(typeof subResp.remove).toBe("function");
+    subResp.remove();
+  });
+});
+
 
 

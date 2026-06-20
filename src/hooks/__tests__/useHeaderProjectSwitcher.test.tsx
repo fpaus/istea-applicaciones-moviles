@@ -108,4 +108,13 @@ describe("useHeaderProjectSwitcher", () => {
 
     expect(result.current.manage.editingId).toBeNull();
   });
+
+  it("exposes empty name when currentProject is null", () => {
+    useProjectStore.setState({
+      currentProject: null,
+    });
+    const { result } = renderHook(() => useHeaderProjectSwitcher());
+
+    expect(result.current.projectName).toBe("");
+  });
 });

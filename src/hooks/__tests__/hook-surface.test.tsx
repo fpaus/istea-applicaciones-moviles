@@ -205,4 +205,25 @@ describe("useTaskActions", () => {
     expect(alertSpy).not.toHaveBeenCalled();
     alertSpy.mockRestore();
   });
+
+  it("deleteTask does nothing when currentProject is null", async () => {
+    useProjectStore.setState({
+      currentProject: null,
+      hasHydrated: true,
+    });
+    useTaskStore.setState({
+      tasks: {},
+      hasHydrated: true,
+    });
+
+    const alertSpy = jest.spyOn(Alert, "alert");
+    const { result } = renderHook(() => useTaskActions());
+
+    await act(async () => {
+      await result.current.deleteTask("some-id");
+    });
+
+    expect(alertSpy).not.toHaveBeenCalled();
+    alertSpy.mockRestore();
+  });
 });

@@ -4,6 +4,8 @@ import { useTaskStore } from "../stores/task-store";
 import { useProjectStore } from "../stores/project-store";
 import { Task } from "../types";
 
+const EMPTY_ARRAY: Task[] = [];
+
 export interface UseEditTaskFormResult {
   title: string;
   setTitle: (title: string) => void;
@@ -31,8 +33,8 @@ export function useEditTaskForm(
   const projectName = currentProject?.name ?? "";
 
   const updateTask = useTaskStore((s) => s.updateTask);
-  const oldTask = useTaskStore((s) =>
-    (s.tasks[projectId] || []).find((t) => t.id === taskId),
+  const oldTask = useTaskStore(
+    useCallback((s) => (s.tasks[projectId] ?? EMPTY_ARRAY).find((t) => t.id === taskId), [projectId, taskId])
   );
 
   const [title, setTitle] = useState(oldTask?.title ?? "");

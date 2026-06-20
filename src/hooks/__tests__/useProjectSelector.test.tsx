@@ -126,4 +126,25 @@ describe("useProjectSelector", () => {
     alertSpy.mockRestore();
     selectProjectSpy.mockRestore();
   });
+
+  it("handleCreate displays generic fallback error if message is empty", async () => {
+    const createProjectSpy = jest
+      .spyOn(useProjectStore.getState(), "createProject")
+      .mockRejectedValueOnce(new Error(""));
+
+    const { result } = renderHook(() => useProjectSelector());
+
+    act(() => {
+      result.current.startCreating();
+      result.current.changeName("some project");
+    });
+
+    await act(async () => {
+      await result.current.handleCreate();
+    });
+
+    expect(result.current.error).toBe("Error al crear el proyecto");
+
+    createProjectSpy.mockRestore();
+  });
 });

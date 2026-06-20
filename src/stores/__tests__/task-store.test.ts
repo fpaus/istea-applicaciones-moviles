@@ -5,7 +5,7 @@ import { NewTask } from "../../types";
 
 function makeFakeNotifications() {
   return {
-    scheduleNotification: jest.fn(async () => "notif-1"),
+    scheduleNotification: jest.fn(async (): Promise<string | null> => "notif-1"),
     cancelNotification: jest.fn(async () => {}),
     cancelAllNotifications: jest.fn(async () => {}),
   } satisfies NotificationScheduler;
@@ -43,6 +43,27 @@ describe("task store", () => {
     expect(tasks["project-1"][0].title).toBe("Drink water");
     expect(tasks["project-1"][0].notification?.notificationId).toBe("notif-1");
     expect(tasks["project-1"][0].completed).toBe(false);
+  });
+
+  it("addTask stores parentId if provided, or null if absent", async () => {
+    const notifications = makeFakeNotifications();
+    const store = makeStore(notifications);
+
+    // Add root task (no parentId)
+    await store.getState().addTask("project-1", "Work", sampleInput);
+    const rootTask = store.getState().tasks["project-1"][0];
+    expect(rootTask.parentId).toBeNull();
+
+    // Add subtask (with parentId)
+    const subtaskInput: NewTask = {
+      title: "Subtask title",
+      description: "Subtask desc",
+      notification: null,
+      parentId: rootTask.id,
+    };
+    await store.getState().addTask("project-1", "Work", subtaskInput);
+    const subtask = store.getState().tasks["project-1"][0];
+    expect(subtask.parentId).toBe(rootTask.id);
   });
 
   it("addTask with no reminder stores notification: null and does NOT call the scheduler", async () => {
@@ -91,6 +112,41 @@ describe("task store", () => {
     expect(store.getState().tasks["project-1"]).toHaveLength(0);
   });
 
+  it("deleteTask removes the target task and all of its descendants, cancelling their notifications", async () => {
+    const notifications = makeFakeNotifications();
+    notifications.scheduleNotification
+      .mockResolvedValueOnce("notif-parent")
+      .mockResolvedValueOnce("notif-child");
+    const store = makeStore(notifications);
+
+    // Add root task with reminder
+    await store.getState().addTask("project-1", "Work", sampleInput);
+    const rootTask = store.getState().tasks["project-1"][0];
+
+    // Add child task with reminder
+    const childInput: NewTask = {
+      title: "Child task",
+      description: "Sub task",
+      notification: {
+        time: { hour: 10, minute: 0 },
+        repeats: false,
+        notificationId: null,
+      },
+      parentId: rootTask.id,
+    };
+    await store.getState().addTask("project-1", "Work", childInput);
+
+    // Now trigger deleteTask on parent
+    await store.getState().deleteTask("project-1", rootTask.id);
+
+    // Verify both notifications cancelled
+    expect(notifications.cancelNotification).toHaveBeenCalledWith("notif-parent");
+    expect(notifications.cancelNotification).toHaveBeenCalledWith("notif-child");
+
+    // Verify both tasks deleted from store
+    expect(store.getState().tasks["project-1"]).toHaveLength(0);
+  });
+
   it("markCompleted sets completed true and nulls the notificationId", async () => {
     const notifications = makeFakeNotifications();
     const store = makeStore(notifications);
@@ -103,7 +159,244 @@ describe("task store", () => {
     expect(notifications.cancelNotification).toHaveBeenCalledWith("notif-1");
     const task = store.getState().tasks["project-1"][0];
     expect(task.completed).toBe(true);
-    expect(task.notification).toBeNull();
+    expect(task.notification?.notificationId).toBeNull();
+  });
+
+  describe("completion cascade and reminder rescheduling on re-open", () => {
+    beforeEach(() => {
+      jest.useFakeTimers();
+      jest.setSystemTime(new Date("2026-06-20T12:00:00")); // Noon (12:00)
+    });
+
+    afterEach(() => {
+      jest.useRealTimers();
+    });
+
+    it("markCompleted cascades down and cancels notifications", async () => {
+      const notifications = makeFakeNotifications();
+      notifications.scheduleNotification
+        .mockResolvedValueOnce("notif-p")
+        .mockResolvedValueOnce("notif-c");
+      const store = makeStore(notifications);
+
+      // Root task
+      await store.getState().addTask("project-1", "Work", sampleInput);
+      const rootTask = store.getState().tasks["project-1"][0];
+
+      // Subtask
+      const childInput: NewTask = {
+        title: "Subtask",
+        description: "",
+        notification: {
+          time: { hour: 13, minute: 0 },
+          repeats: true,
+          notificationId: null,
+        },
+        parentId: rootTask.id,
+      };
+      await store.getState().addTask("project-1", "Work", childInput);
+
+      // Complete root task
+      await store.getState().markCompleted("project-1", rootTask.id);
+
+      expect(notifications.cancelNotification).toHaveBeenCalledWith("notif-p");
+      expect(notifications.cancelNotification).toHaveBeenCalledWith("notif-c");
+
+      const tasks = store.getState().tasks["project-1"];
+      const updatedRoot = tasks.find((t) => t.id === rootTask.id);
+      const updatedChildTask = tasks.find((t) => t.title === "Subtask");
+
+      expect(updatedRoot?.completed).toBe(true);
+      expect(updatedRoot?.notification?.notificationId).toBeNull();
+      expect(updatedChildTask?.completed).toBe(true);
+      expect(updatedChildTask?.notification?.notificationId).toBeNull();
+    });
+
+    it("reopenTask cascades up and reschedules repeating or future one-shot reminders, but skips past one-shot", async () => {
+      const notifications = makeFakeNotifications();
+      notifications.scheduleNotification
+        .mockResolvedValueOnce("notif-p-new")
+        .mockResolvedValueOnce("notif-c-new");
+      const store = makeStore(notifications);
+
+      // Add parent with future one-shot reminder (at 13:00, which is > 12:00)
+      const parentInput: NewTask = {
+        title: "Parent task",
+        description: "",
+        notification: {
+          time: { hour: 13, minute: 0 },
+          repeats: false,
+          notificationId: null,
+        },
+      };
+      await store.getState().addTask("project-1", "Work", parentInput);
+      const parent = store.getState().tasks["project-1"][0];
+
+      // Add child with past one-shot reminder (at 11:00, which is < 12:00)
+      const child1Input: NewTask = {
+        title: "Child past one-shot",
+        description: "",
+        notification: {
+          time: { hour: 11, minute: 0 },
+          repeats: false,
+          notificationId: null,
+        },
+        parentId: parent.id,
+      };
+      await store.getState().addTask("project-1", "Work", child1Input);
+      const child1 = store.getState().tasks["project-1"][0];
+
+      // Add grandchild with repeating reminder (at 9:00, but repeats = true, so always reschedules)
+      const grandchildInput: NewTask = {
+        title: "Grandchild repeating",
+        description: "",
+        notification: {
+          time: { hour: 9, minute: 0 },
+          repeats: true,
+          notificationId: null,
+        },
+        parentId: child1.id,
+      };
+      await store.getState().addTask("project-1", "Work", grandchildInput);
+      const grandchild = store.getState().tasks["project-1"][0];
+
+      // Add unrelated task that shouldn't be affected by reopen cascades (covers line 130 fallback)
+      const unrelatedInput: NewTask = {
+        title: "Unrelated task",
+        description: "",
+        notification: null,
+      };
+      await store.getState().addTask("project-1", "Work", unrelatedInput);
+
+      // Complete parent task (cascades down, cancels all, sets notificationIds to null)
+      await store.getState().markCompleted("project-1", parent.id);
+
+      // Clear scheduler calls
+      (notifications.scheduleNotification as jest.Mock).mockClear();
+
+      // Now reopen grandchild (cascades up, reopens child1 and parent)
+      await store.getState().reopenTask("project-1", grandchild.id, "Work");
+
+      const tasks = store.getState().tasks["project-1"];
+      const updatedParent = tasks.find((t) => t.id === parent.id);
+      const updatedChild1 = tasks.find((t) => t.id === child1.id);
+      const updatedGrandchild = tasks.find((t) => t.id === grandchild.id);
+      const updatedUnrelated = tasks.find((t) => t.title === "Unrelated task");
+
+      expect(updatedParent?.completed).toBe(false);
+      expect(updatedChild1?.completed).toBe(false);
+      expect(updatedGrandchild?.completed).toBe(false);
+      expect(updatedUnrelated?.completed).toBe(false); // remained incomplete/untouched
+
+      // Verifications of rescheduling:
+      // Parent: future one-shot (13:00 > 12:00) -> rescheduled!
+      // Child1: past one-shot (11:00 < 12:00) -> skipped!
+      // Grandchild: repeating (repeats: true) -> rescheduled!
+      
+      // Let's assert schedule calls:
+      expect(notifications.scheduleNotification).toHaveBeenCalledWith(
+        "[Work] Parent task",
+        "",
+        { hour: 13, minute: 0 },
+        false
+      );
+      expect(notifications.scheduleNotification).toHaveBeenCalledWith(
+        "Grandchild repeating",
+        "",
+        { hour: 9, minute: 0 },
+        true
+      );
+      expect(notifications.scheduleNotification).not.toHaveBeenCalledWith(
+        "Child past one-shot",
+        expect.anything(),
+        expect.anything(),
+        expect.anything()
+      );
+    });
+
+    it("handles notification scheduling failures during reopenTask gracefully", async () => {
+      const notifications = makeFakeNotifications();
+      notifications.scheduleNotification.mockRejectedValue(new Error("Schedule error"));
+      const errorSpy = jest.spyOn(console, "error").mockImplementation(() => {});
+      const store = makeStore(notifications);
+
+      const parentInput: NewTask = {
+        title: "Parent task",
+        description: "",
+        notification: {
+          time: { hour: 13, minute: 0 },
+          repeats: true,
+          notificationId: null,
+        },
+      };
+      await store.getState().addTask("project-1", "Work", parentInput);
+      const parent = store.getState().tasks["project-1"][0];
+
+      // Complete parent task
+      await store.getState().markCompleted("project-1", parent.id);
+
+      // Reopen parent task - scheduling will fail
+      await store.getState().reopenTask("project-1", parent.id, "Work");
+
+      const tasks = store.getState().tasks["project-1"];
+      const updatedParent = tasks.find((t) => t.id === parent.id);
+      expect(updatedParent?.completed).toBe(false);
+      expect(updatedParent?.notification?.notificationId).toBeNull();
+      expect(errorSpy).toHaveBeenCalledWith(
+        "[task-store] Failed to reschedule notification on reopen:",
+        expect.any(Error)
+      );
+
+      errorSpy.mockRestore();
+    });
+
+    it("automatically reopens completed parent and ancestors when adding an incomplete subtask", async () => {
+      const notifications = makeFakeNotifications();
+      notifications.scheduleNotification.mockResolvedValue("notif-parent-reopened");
+      const store = makeStore(notifications);
+
+      // Add parent with repeating reminder and complete it
+      const parentInput: NewTask = {
+        title: "Parent task",
+        description: "",
+        notification: {
+          time: { hour: 10, minute: 0 },
+          repeats: true,
+          notificationId: null,
+        },
+      };
+      await store.getState().addTask("project-1", "Work", parentInput);
+      const parentId = store.getState().tasks["project-1"][0].id;
+      await store.getState().markCompleted("project-1", parentId);
+
+      // Clear scheduler calls
+      (notifications.scheduleNotification as jest.Mock).mockClear();
+
+      // Now add a subtask to the completed parent
+      const subtaskInput: NewTask = {
+        title: "Subtask title",
+        description: "",
+        notification: null,
+        parentId: parentId,
+      };
+      await store.getState().addTask("project-1", "Work", subtaskInput);
+
+      const tasks = store.getState().tasks["project-1"];
+      const updatedParent = tasks.find((t) => t.id === parentId);
+      const subtask = tasks.find((t) => t.title === "Subtask title");
+
+      // Verify parent was reopened
+      expect(updatedParent?.completed).toBe(false);
+      expect(updatedParent?.notification?.notificationId).toBe("notif-parent-reopened");
+      expect(subtask?.completed).toBe(false);
+
+      expect(notifications.scheduleNotification).toHaveBeenCalledWith(
+        "[Work] Parent task",
+        "",
+        { hour: 10, minute: 0 },
+        true
+      );
+    });
   });
 
   it("clearAll cancels all notifications and empties the project's list", async () => {
@@ -171,7 +464,7 @@ describe("task store", () => {
 
   it("removeProjectTasks updates immutably and skips tasks without a notificationId", async () => {
     const notifications = makeFakeNotifications();
-    notifications.scheduleNotification.mockResolvedValueOnce(null as any);
+    notifications.scheduleNotification.mockResolvedValueOnce(null as string | null);
     const store = makeStore(notifications);
 
     await store.getState().addTask("project-1", "Work", sampleInput);

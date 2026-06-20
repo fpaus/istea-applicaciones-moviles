@@ -1,5 +1,25 @@
 import { useCallback } from "react";
 import { useProjectSelector } from "./useProjectSelector";
+import { Project } from "../types";
+import { UseProjectManagerResult } from "./useProjectManager";
+
+export interface UseHeaderProjectSwitcherResult {
+  currentProject: Project | null;
+  projectName: string;
+  projects: Project[];
+  isOpen: boolean;
+  open: () => void;
+  close: () => void;
+  handleSelect: (id: string) => Promise<void>;
+  isCreating: boolean;
+  newProjectName: string;
+  error: string;
+  changeName: (text: string) => void;
+  startCreating: () => void;
+  cancelCreating: () => void;
+  handleCreate: () => Promise<void>;
+  manage: UseProjectManagerResult;
+}
 
 /**
  * Encapsulates the header project switcher: the active project name plus the
@@ -8,7 +28,7 @@ import { useProjectSelector } from "./useProjectSelector";
  * header-friendly names. Keeps the header component fully presentational
  * (no logic / no primitive hooks in components).
  */
-export function useHeaderProjectSwitcher() {
+export function useHeaderProjectSwitcher(): UseHeaderProjectSwitcherResult {
   const {
     currentProject,
     projects,

@@ -8,7 +8,7 @@ const EMPTY_ARRAY: Task[] = [];
 /**
  * Returns the completed tasks for the current project.
  */
-export function useCompletedTasks() {
+export function useCompletedTasks(): Task[] {
   const currentProject = useProjectStore((s) => s.currentProject);
   const projectId = currentProject?.id || "";
 
@@ -16,5 +16,10 @@ export function useCompletedTasks() {
     useCallback((s) => s.tasks[projectId] || EMPTY_ARRAY, [projectId]),
   );
 
-  return useMemo(() => selectCompleted(projectTasks), [projectTasks]);
+  const rootTasks = useMemo(
+    () => projectTasks.filter((t) => !t.parentId),
+    [projectTasks],
+  );
+
+  return useMemo(() => selectCompleted(rootTasks), [rootTasks]);
 }

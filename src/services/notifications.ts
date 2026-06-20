@@ -1,50 +1,96 @@
 import * as Device from "expo-device";
-import * as Notifications from "expo-notifications";
+import type * as NotificationsType from "expo-notifications";
 import { Platform } from "react-native";
 import { Time } from "../types";
 
-Notifications.setNotificationHandler({
-  handleNotification: async (notification) => ({
-    shouldShowBanner: true,
-    shouldShowList: true,
-    shouldPlaySound: true,
-    shouldSetBadge: true,
-  }),
-});
+let Notifications: typeof NotificationsType | null = null;
+try {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  Notifications = require("expo-notifications") as typeof NotificationsType;
+} catch (error) {
+  console.warn(
+    "[NotificationService] Failed to load expo-notifications module. Notification features will be disabled.",
+    error,
+  );
+}
+
+if (Notifications) {
+  try {
+    Notifications.setNotificationHandler({
+      handleNotification: async () => ({
+        shouldShowBanner: true,
+        shouldShowList: true,
+        shouldPlaySound: true,
+        shouldSetBadge: true,
+      }),
+    });
+  } catch (error) {
+    console.error("[NotificationService] Failed to set notification handler:", error);
+  }
+}
 
 export type PermissionStatus = "idle" | "granted" | "denied" | "loading";
 
 export class NotificationService {
   async requestPermission(): Promise<boolean> {
+    if (!Notifications) {
+      return false;
+    }
     if (!Device.isDevice) {
       console.warn(
         "[NotificationService] Emulator detected. Notifications may not work.",
       );
     }
     if (Platform.OS === "android") {
-      await Notifications.setNotificationChannelAsync("tasks", {
-        name: "Tasks",
-        importance: Notifications.AndroidImportance.HIGH,
-        vibrationPattern: [0, 250, 250, 250],
-        lightColor: "#6C63FF",
-        sound: "default",
-      });
+      try {
+        await Notifications.setNotificationChannelAsync("tasks", {
+          name: "Tasks",
+          importance: Notifications.AndroidImportance.HIGH,
+          vibrationPattern: [0, 250, 250, 250],
+          lightColor: "#6C63FF",
+          sound: "default",
+        });
+      } catch (error) {
+        console.error(
+          "[NotificationService] Failed to set notification channel:",
+          error,
+        );
+      }
     }
-    const { status: existingStatus } =
-      await Notifications.getPermissionsAsync();
-    let finalStatus = existingStatus;
-    if (existingStatus !== "granted") {
-      const { status } = await Notifications.requestPermissionsAsync({
-        ios: { allowAlert: true, allowBadge: true, allowSound: true },
-      });
-      finalStatus = status;
+    try {
+      const { status: existingStatus } =
+        await Notifications.getPermissionsAsync();
+      let finalStatus = existingStatus;
+      if (existingStatus !== "granted") {
+        const { status } = await Notifications.requestPermissionsAsync({
+          ios: { allowAlert: true, allowBadge: true, allowSound: true },
+        });
+        finalStatus = status;
+      }
+      return finalStatus === "granted";
+    } catch (error) {
+      console.error(
+        "[NotificationService] Failed to check/request permissions:",
+        error,
+      );
+      return false;
     }
-    return finalStatus === "granted";
   }
 
   async checkPermission(): Promise<boolean> {
-    const { status } = await Notifications.getPermissionsAsync();
-    return status === "granted";
+    if (!Notifications) {
+      return false;
+    }
+    try {
+      const { status } = await Notifications.getPermissionsAsync();
+      return status === "granted";
+    } catch (error) {
+      console.error(
+        "[NotificationService] Failed to check permission:",
+        error,
+      );
+      return false;
+    }
   }
 
   async scheduleNotification(
@@ -53,62 +99,87 @@ export class NotificationService {
     time: Time,
     repeats: boolean,
   ): Promise<string | null> {
+    if (!Notifications) {
+      return null;
+    }
     const isGranted = await this.requestPermission();
-    if (!isGranted) return null;
-
-    let trigger: Notifications.NotificationTriggerInput;
-
-    if (repeats) {
-      trigger = {
-        type: Notifications.SchedulableTriggerInputTypes.DAILY,
-        hour: time.hour,
-        minute: time.minute,
-      };
-    } else {
-      const now = new Date();
-      const target = new Date();
-      target.setHours(time.hour, time.minute, 0, 0);
-      if (target <= now) {
-        target.setDate(target.getDate() + 1);
-      }
-      trigger = {
-        type: Notifications.SchedulableTriggerInputTypes.DATE,
-        date: target,
-      };
+    if (!isGranted) {
+      return null;
     }
 
-    return await Notifications.scheduleNotificationAsync({
-      content: {
-        title,
-        body,
-        sound: "default",
-        data: { type: "task" },
-      },
-      trigger,
-    });
+    try {
+      let trigger: NotificationsType.NotificationTriggerInput;
+
+      if (repeats) {
+        trigger = {
+          type: Notifications.SchedulableTriggerInputTypes.DAILY,
+          hour: time.hour,
+          minute: time.minute,
+        };
+      } else {
+        const now = new Date();
+        const target = new Date();
+        target.setHours(time.hour, time.minute, 0, 0);
+        if (target <= now) {
+          target.setDate(target.getDate() + 1);
+        }
+        trigger = {
+          type: Notifications.SchedulableTriggerInputTypes.DATE,
+          date: target,
+        };
+      }
+
+      return await Notifications.scheduleNotificationAsync({
+        content: {
+          title,
+          body,
+          sound: "default",
+          data: { type: "task" },
+        },
+        trigger,
+      });
+    } catch (error) {
+      console.error(
+        "[NotificationService] Failed to schedule notification:",
+        error,
+      );
+      return null;
+    }
   }
 
   async cancelNotification(id: string): Promise<void> {
+    if (!Notifications) {
+      return;
+    }
     await Notifications.cancelScheduledNotificationAsync(id).catch(
       console.error,
     );
   }
 
   async cancelAllNotifications(): Promise<void> {
+    if (!Notifications) {
+      return;
+    }
     await Notifications.cancelAllScheduledNotificationsAsync().catch(
       console.error,
     );
   }
 
   addNotificationReceivedListener(
-    callback: (notification: Notifications.Notification) => void,
-  ) {
+    callback: (notification: NotificationsType.Notification) => void,
+  ): { remove: () => void } {
+    if (!Notifications) {
+      return { remove: (): void => {} };
+    }
     return Notifications.addNotificationReceivedListener(callback);
   }
 
   addNotificationResponseReceivedListener(
-    callback: (response: Notifications.NotificationResponse) => void,
-  ) {
+    callback: (response: NotificationsType.NotificationResponse) => void,
+  ): { remove: () => void } {
+    if (!Notifications) {
+      return { remove: (): void => {} };
+    }
     return Notifications.addNotificationResponseReceivedListener(callback);
   }
 }

@@ -11,6 +11,8 @@ interface CardItemProps {
   onMarkCompleted: (id: string) => void;
   onDelete: (id: string) => void;
   onEdit?: (id: string) => void;
+  childrenCount?: number;
+  completedChildrenCount?: number;
 }
 
 export function CardItem({
@@ -18,22 +20,37 @@ export function CardItem({
   onMarkCompleted,
   onDelete,
   onEdit,
+  childrenCount,
+  completedChildrenCount,
 }: CardItemProps) {
   return (
     <Card style={styles.card}>
       <View style={styles.cardHeader}>
         <Typography variant="h3">{item.title}</Typography>
-        {!item.completed && (
-          <Switch
-            value={item.completed}
-            onValueChange={() => onMarkCompleted(item.id)}
-            trackColor={{ true: Colors.light.primary }}
-          />
-        )}
+        <Switch
+          value={item.completed}
+          onValueChange={() => onMarkCompleted(item.id)}
+          trackColor={{ true: Colors.light.primary }}
+        />
       </View>
       <Typography variant="body" style={styles.description}>
         {item.description}
       </Typography>
+      {childrenCount !== undefined && childrenCount > 0 && (
+        <View style={styles.progressContainer}>
+          <Typography variant="caption" style={styles.progressText}>
+            Subtareas: {completedChildrenCount ?? 0} de {childrenCount} ({Math.round(((completedChildrenCount ?? 0) / childrenCount) * 100)}%)
+          </Typography>
+          <View style={styles.progressBarBg}>
+            <View
+              style={[
+                styles.progressBarFill,
+                { width: `${((completedChildrenCount ?? 0) / childrenCount) * 100}%` },
+              ]}
+            />
+          </View>
+        </View>
+      )}
       <View style={styles.cardFooter}>
         {item.notification ? (
           <Typography variant="caption">
@@ -77,6 +94,26 @@ const styles = StyleSheet.create({
   },
   description: {
     marginBottom: Utility.spacing.m,
+  },
+  progressContainer: {
+    marginTop: Utility.spacing.s,
+    marginBottom: Utility.spacing.m,
+  },
+  progressText: {
+    color: "#666",
+    marginBottom: Utility.spacing.xs,
+    fontSize: 12,
+  },
+  progressBarBg: {
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: "#E2E8F0",
+    overflow: "hidden",
+  },
+  progressBarFill: {
+    height: "100%",
+    borderRadius: 3,
+    backgroundColor: Colors.light.primary,
   },
   cardFooter: {
     flexDirection: "row",

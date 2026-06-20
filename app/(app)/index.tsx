@@ -3,6 +3,7 @@ import { ProjectSelector } from "@/src/components/ProjectSelector";
 import { Typography } from "@/src/components/ui/Typography";
 import { Colors, Utility } from "@/src/constants/theme";
 import { useDashboard } from "@/src/hooks/useDashboard";
+import { useTaskCompletion } from "@/src/hooks/useTaskCompletion";
 import { useRouter } from "expo-router";
 import {
   SectionList,
@@ -18,11 +19,12 @@ export default function Index() {
     projectId,
     activeTasks,
     completedTasks,
-    markCompleted,
     deleteTask,
     hasPermission,
     requestPermission,
+    getDirectChildrenProgress,
   } = useDashboard();
+  const { completeTask, reopenTask } = useTaskCompletion();
   const router = useRouter();
 
   if (!isProjectSelected) {
@@ -69,19 +71,24 @@ export default function Index() {
             No hay tareas todavía. ¡Agrega una!
           </Typography>
         }
-        renderItem={({ item }) => (
-          <CardItem
-            item={item}
-            onMarkCompleted={markCompleted}
-            onDelete={deleteTask}
-            onEdit={(id) => {
-              router.push({
-                pathname: "/edit" as any,
-                params: { projectId, taskId: id },
-              });
-            }}
-          />
-        )}
+        renderItem={({ item }) => {
+          const progress = getDirectChildrenProgress(item.id);
+          return (
+            <CardItem
+              item={item}
+              onMarkCompleted={item.completed ? reopenTask : completeTask}
+              onDelete={deleteTask}
+              onEdit={(id) => {
+                router.push({
+                  pathname: "/edit",
+                  params: { projectId, taskId: id },
+                });
+              }}
+              childrenCount={progress.total}
+              completedChildrenCount={progress.completed}
+            />
+          );
+        }}
       />
 
       <TouchableOpacity
