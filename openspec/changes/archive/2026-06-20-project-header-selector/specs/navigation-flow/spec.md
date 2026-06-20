@@ -31,3 +31,16 @@ project switcher.
 - **WHEN** the dashboard is shown with an active project
 - **THEN** there is no drawer to open
 - **AND** project switching is available from the header
+
+### Requirement: New projects can be created from the header switcher
+
+The header project switcher SHALL offer a "Nuevo Proyecto" affordance so a new
+project can be created without leaving the dashboard. Creating a project SHALL
+activate it immediately and close the switcher.
+
+#### Scenario: Creating a project from the switcher
+
+- **GIVEN** the header switcher is open and at least one project already exists
+- **WHEN** the user chooses "Nuevo Proyecto", enters a name and confirms
+- **THEN** the new project is created and becomes active
+- **AND** the switcher closes and the dashboard shows the new project

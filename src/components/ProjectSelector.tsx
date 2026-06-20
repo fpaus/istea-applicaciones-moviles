@@ -1,16 +1,10 @@
-import {
-  FlatList,
-  Modal,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
-} from "react-native";
+import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { useProjectSelector } from "../hooks/useProjectSelector";
 import { Colors, Utility } from "../constants/theme";
 import { Button } from "./ui/Button";
 import { Input } from "./ui/Input";
 import { Typography } from "./ui/Typography";
+import { ProjectPickerModal } from "./ProjectPickerModal";
 
 interface ProjectSelectorProps {
   compact?: boolean;
@@ -116,47 +110,14 @@ export function ProjectSelector({
         </View>
       )}
 
-      {/* Picker Modal Dropdown */}
-      <Modal
+      {/* Picker Modal Dropdown (shared, list-only) */}
+      <ProjectPickerModal
         visible={showDropdown}
-        transparent={true}
-        animationType="fade"
-        onRequestClose={closeDropdown}
-      >
-        <TouchableOpacity
-          style={styles.modalOverlay}
-          activeOpacity={1}
-          onPress={closeDropdown}
-        >
-          <View style={styles.modalContent}>
-            <Typography variant="h3" style={styles.modalTitle}>
-              Proyectos
-            </Typography>
-            <FlatList
-              data={projects}
-              keyExtractor={(item) => item.id}
-              renderItem={({ item }) => (
-                <TouchableOpacity
-                  style={[
-                    styles.itemRow,
-                    currentProject?.id === item.id && styles.activeItemRow,
-                  ]}
-                  onPress={() => handleSelect(item.id)}
-                >
-                  <Text
-                    style={[
-                      styles.itemText,
-                      currentProject?.id === item.id && styles.activeItemText,
-                    ]}
-                  >
-                    {item.name}
-                  </Text>
-                </TouchableOpacity>
-              )}
-            />
-          </View>
-        </TouchableOpacity>
-      </Modal>
+        projects={projects}
+        currentId={currentProject?.id}
+        onSelect={handleSelect}
+        onClose={closeDropdown}
+      />
     </View>
   );
 }
@@ -226,48 +187,5 @@ const styles = StyleSheet.create({
   formBtn: {
     flex: 1,
     paddingVertical: 10,
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: "rgba(0,0,0,0.4)",
-    justifyContent: "center",
-    alignItems: "center",
-    padding: Utility.spacing.xl,
-  },
-  modalContent: {
-    width: "100%",
-    maxHeight: "60%",
-    backgroundColor: Colors.light.background,
-    borderRadius: Utility.borderRadius.m,
-    padding: Utility.spacing.l,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.25,
-    shadowRadius: 10,
-    elevation: 5,
-  },
-  modalTitle: {
-    marginBottom: Utility.spacing.m,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.light.border,
-    paddingBottom: Utility.spacing.s,
-  },
-  itemRow: {
-    paddingVertical: 14,
-    paddingHorizontal: Utility.spacing.s,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: Colors.light.border,
-  },
-  activeItemRow: {
-    backgroundColor: "#e8e7ff",
-    borderRadius: Utility.borderRadius.s,
-  },
-  itemText: {
-    fontSize: 16,
-    color: Colors.light.text,
-  },
-  activeItemText: {
-    color: Colors.light.primary,
-    fontWeight: "bold",
   },
 });

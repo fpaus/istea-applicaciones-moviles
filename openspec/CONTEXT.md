@@ -23,7 +23,7 @@ There is **no remote server or API**. All state lives on the device via
 | Runtime | Expo SDK 54, React 19, React Native 0.81 |
 | Language | TypeScript (~5.9) |
 | Routing | `expo-router` ~6 (file-based, route groups) |
-| Navigation UI | `@react-navigation/drawer`, bottom-tabs, native stack |
+| Navigation UI | `expo-router` native stack with a custom header |
 | Notifications | `expo-notifications` (local scheduling + permissions) |
 | Persistence | `@react-native-async-storage/async-storage` |
 | Tooling | ESLint (`eslint-config-expo`), Prettier |
@@ -134,7 +134,7 @@ Written by each store's `persist` middleware (JSON-serialized store state):
 ### Project Selection (local, on-device)
 - **Create Project** (`useProjectStore.createProject`): rejects duplicate project names (case-insensitive), appends to the store's `projects` list, and automatically selects it as the active `currentProject`.
 - **Select Project** (`useProjectStore.selectProject`): sets the active `currentProject` in the store.
-- **Switch Project**: Toggled instantly via the reusable `<ProjectSelector>` component embedded in the bottom of the navigation drawer.
+- **Switch Project**: The dashboard header shows the active project name; tapping it (`<HeaderProjectSwitcher>`) opens the shared `<ProjectPickerModal>` to switch the active project instantly, in place. The picker also offers a "+ Nuevo Proyecto" row to create another project without leaving the dashboard.
 - Session restored on launch by the project store's `persist` rehydration.
 
 ### Tasks
@@ -180,9 +180,9 @@ Written by each store's `persist` middleware (JSON-serialized store state):
 ### Routing structure
 ```
 app/_layout.tsx          hydration gate (useHydrated) + useNotificationBridge → Stack
-  (app)/_layout.tsx      Drawer (swipe & header hidden if no active project)
+  (app)/_layout.tsx      Stack (header hidden if no active project); dashboard header hosts HeaderProjectSwitcher
     index.tsx            dashboard (Active / Completed) + FAB; renders ProjectSelector inline if no active project
-    add.tsx              create task (hidden from drawer)
+    add.tsx              create task (pushed screen with back affordance, no switcher)
 ```
 
 
@@ -227,7 +227,8 @@ The following architectural and design decisions were made during the refactorin
 - **Cross-Project Notification Scan Bridge**: Because OS-level local notification fired events only receive a flat `notificationId` payload without metadata, the `useNotificationBridge` invokes `clearNotificationId` which scans the entire dictionary across all project IDs to locate and nullify the matching notification ID globally.
 - **Resilient Fallback on Notification Rejection**: If local notification scheduling fails or the user denies permission, the store still successfully persists the task with a `null` `notificationId`. The application handles `null` notification IDs gracefully, ensuring local task access remains unimpeded.
 - **Case-Insensitive Project Uniqueness**: To avoid duplicate projects, project creation checks name existence using trimmed, case-insensitive logic.
-- **Seamless In-Place Project Selector**: Rather than requiring a logout step, the active navigation drawer embeds the `<ProjectSelector>` in compact mode, enabling instant project-switching in-place without redirecting to a splash screen or forcing screen resets.
+- **Seamless In-Place Project Selector**: Rather than requiring a logout step, the dashboard header exposes `<HeaderProjectSwitcher>` (the active project name as a tappable affordance), enabling instant project-switching in-place without redirecting to a splash screen or forcing screen resets. First-run selection still renders `<ProjectSelector>` inline on the dashboard when no project is active.
+- **Single Reusable Picker (`<ProjectPickerModal>`)**: The project list + inline-create modal is a single presentational component whose behavior is passed entirely via props (`onSelect`, `onClose`, optional `create` flow). Both `<ProjectSelector>` (list-only) and `<HeaderProjectSwitcher>` (list + create) render it, so the picker UI/UX has one source of truth. `useHeaderProjectSwitcher` delegates to `useProjectSelector` so the create/select logic also lives in one place.
 - **Separation of Read-only and Actionable Hooks**: The hook layer is split into fine-grained task list hooks (`useActiveTasks()`, `useCompletedTasks()`) and a mutation hook (`useTaskActions()`). This ensures that screens only dispatching actions (e.g., the add task screen) do not subscribe to list changes, preventing unnecessary renders.
 - **Interactive Notification Permission Check**: The application queries OS permission status before rendering the dashboard and displays an inline interactive warning banner if notifications are disabled, allowing the user to request permission directly.
 - **Destructive Confirmation Interceptors**: Destructive hook actions (like `clearAll`) are intercepted by native confirmation alerts before executing store mutations to prevent accidental data loss.

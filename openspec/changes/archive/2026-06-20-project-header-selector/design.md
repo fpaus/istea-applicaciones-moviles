@@ -22,14 +22,22 @@ is therefore the drawer's sole real purpose.
 
 ## Decisions
 
-### Header switcher reuses `ProjectSelector`
+### Header switcher reuses a shared `ProjectPickerModal`
 
 Render a header title/button showing `currentProject.name`; tapping it opens the
-existing `ProjectSelector` (its modal dropdown already lists projects and handles
-`selectProject`). Encapsulate the open/close + header-title logic in a custom hook
-(e.g. `useHeaderProjectSwitcher`) per the "no logic in components" rule.
-*Alternative:* a brand-new bespoke header dropdown — rejected to avoid duplicating
-the selector that already exists and is tested.
+project picker. Rather than reuse the whole `ProjectSelector` (which bundles a
+trigger box + inline create toggle + modal and can't be opened externally), the
+shared picker is extracted into a presentational `ProjectPickerModal` (project
+list + highlight active + optional inline create) whose behavior arrives entirely
+via props. Both `ProjectSelector` (list-only) and `HeaderProjectSwitcher`
+(list + create) render it, so the picker UI has one source of truth. The
+open/close + select + create logic lives in `useHeaderProjectSwitcher`, which
+delegates to `useProjectSelector` so the create/select logic is also shared (per
+the "no logic in components" rule).
+*Alternative:* reuse the entire `ProjectSelector` component in the header —
+rejected because its trigger/inline-create chrome doesn't fit a header title and
+its modal isn't externally controllable. *Alternative:* a brand-new bespoke
+header dropdown — rejected to avoid duplicating the picker.
 
 ### Drawer → native stack
 
