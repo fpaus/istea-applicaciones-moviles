@@ -10,7 +10,7 @@ import { useTaskActions } from "./useTaskActions";
  * presentational (no primitive hooks, no logic).
  */
 export function useDashboard() {
-  const { isProjectSelected } = useProject();
+  const { isProjectSelected, currentProject } = useProject();
   const activeTasks = useActiveTasks();
   const completedTasks = useCompletedTasks();
   const { markCompleted, deleteTask } = useTaskActions();
@@ -18,6 +18,7 @@ export function useDashboard() {
 
   return {
     isProjectSelected,
+    projectId: currentProject?.id || "",
     activeTasks,
     completedTasks,
     markCompleted,

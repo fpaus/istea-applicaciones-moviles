@@ -29,6 +29,12 @@ export interface TaskState {
     data: NewTask,
   ) => Promise<void>;
   deleteTask: (projectId: string, id: string) => Promise<void>;
+  updateTask: (
+    projectId: string,
+    id: string,
+    patch: Partial<Omit<Task, "id" | "completed" | "createdAt">>,
+    projectName?: string,
+  ) => Promise<void>;
   markCompleted: (projectId: string, id: string) => Promise<void>;
   clearAll: (projectId: string) => Promise<void>;
   /**

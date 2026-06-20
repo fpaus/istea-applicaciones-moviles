@@ -5,9 +5,7 @@ function task(partial: Partial<Task> & { id: string }): Task {
   return {
     title: partial.id,
     description: "",
-    time: { hour: 0, minute: 0 },
-    repeats: false,
-    notificationId: null,
+    notification: null,
     completed: false,
     createdAt: 0,
     ...partial,
@@ -27,11 +25,27 @@ describe("task selectors", () => {
 
   it("selectActive excludes completed and orders by next-upcoming time-of-day", () => {
     const input: Task[] = [
-      task({ id: "past-9", time: { hour: 9, minute: 0 } }), // already passed → tomorrow
-      task({ id: "soon-1000", time: { hour: 10, minute: 0 } }), // exact current time → today
-      task({ id: "soon-1030", time: { hour: 10, minute: 30 } }),
-      task({ id: "later-11", time: { hour: 11, minute: 0 } }),
-      task({ id: "done", time: { hour: 10, minute: 15 }, completed: true }),
+      task({
+        id: "past-9",
+        notification: { time: { hour: 9, minute: 0 }, repeats: false, notificationId: null },
+      }), // already passed → tomorrow
+      task({
+        id: "soon-1000",
+        notification: { time: { hour: 10, minute: 0 }, repeats: false, notificationId: null },
+      }), // exact current time → today
+      task({
+        id: "soon-1030",
+        notification: { time: { hour: 10, minute: 30 }, repeats: false, notificationId: null },
+      }),
+      task({
+        id: "later-11",
+        notification: { time: { hour: 11, minute: 0 }, repeats: false, notificationId: null },
+      }),
+      task({
+        id: "done",
+        notification: { time: { hour: 10, minute: 15 }, repeats: false, notificationId: null },
+        completed: true,
+      }),
     ];
 
     expect(selectActive(input).map((t) => t.id)).toEqual([
@@ -42,11 +56,16 @@ describe("task selectors", () => {
     ]);
   });
 
-
   it("selectActive does not mutate or reorder the input array", () => {
     const input: Task[] = [
-      task({ id: "a", time: { hour: 9, minute: 0 } }),
-      task({ id: "b", time: { hour: 11, minute: 0 } }),
+      task({
+        id: "a",
+        notification: { time: { hour: 9, minute: 0 }, repeats: false, notificationId: null },
+      }),
+      task({
+        id: "b",
+        notification: { time: { hour: 11, minute: 0 }, repeats: false, notificationId: null },
+      }),
     ];
     const snapshot = input.map((t) => t.id);
 
@@ -72,10 +91,22 @@ describe("task selectors", () => {
     // T3: 10:30 (630, soon) -> adjusted = 630
     // T4: 11:00 (660, soon) -> adjusted = 660
     const input = [
-      task({ id: "T2", time: { hour: 9, minute: 30 } }),
-      task({ id: "T4", time: { hour: 11, minute: 0 } }),
-      task({ id: "T1", time: { hour: 9, minute: 0 } }),
-      task({ id: "T3", time: { hour: 10, minute: 30 } }),
+      task({
+        id: "T2",
+        notification: { time: { hour: 9, minute: 30 }, repeats: false, notificationId: null },
+      }),
+      task({
+        id: "T4",
+        notification: { time: { hour: 11, minute: 0 }, repeats: false, notificationId: null },
+      }),
+      task({
+        id: "T1",
+        notification: { time: { hour: 9, minute: 0 }, repeats: false, notificationId: null },
+      }),
+      task({
+        id: "T3",
+        notification: { time: { hour: 10, minute: 30 }, repeats: false, notificationId: null },
+      }),
     ];
 
     expect(selectActive(input).map((t) => t.id)).toEqual([
@@ -83,6 +114,30 @@ describe("task selectors", () => {
       "T4",
       "T1",
       "T2",
+    ]);
+  });
+
+  it("selectActive sorts timed tasks first, then reminder-less tasks by createdAt", () => {
+    const input: Task[] = [
+      task({ id: "no-reminder-2", notification: null, createdAt: 200 }),
+      task({
+        id: "timed-1",
+        notification: { time: { hour: 11, minute: 0 }, repeats: false, notificationId: null },
+        createdAt: 100,
+      }),
+      task({ id: "no-reminder-1", notification: null, createdAt: 50 }),
+      task({
+        id: "timed-2",
+        notification: { time: { hour: 10, minute: 30 }, repeats: false, notificationId: null },
+        createdAt: 300,
+      }),
+    ];
+
+    expect(selectActive(input).map((t) => t.id)).toEqual([
+      "timed-2", // 10:30 (soonest timed)
+      "timed-1", // 11:00 (later timed)
+      "no-reminder-1", // createdAt: 50
+      "no-reminder-2", // createdAt: 200
     ]);
   });
 });

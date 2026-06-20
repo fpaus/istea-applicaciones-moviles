@@ -24,6 +24,13 @@ export default function AppLayout() {
           headerBackTitle: "Volver",
         }}
       />
+      <Stack.Screen
+        name="edit"
+        options={{
+          title: "Editar Tarea",
+          headerBackTitle: "Volver",
+        }}
+      />
     </Stack>
   );
 }

@@ -15,6 +15,7 @@ import {
 export default function Index() {
   const {
     isProjectSelected,
+    projectId,
     activeTasks,
     completedTasks,
     markCompleted,
@@ -73,6 +74,12 @@ export default function Index() {
             item={item}
             onMarkCompleted={markCompleted}
             onDelete={deleteTask}
+            onEdit={(id) => {
+              router.push({
+                pathname: "/edit" as any,
+                params: { projectId, taskId: id },
+              });
+            }}
           />
         )}
       />

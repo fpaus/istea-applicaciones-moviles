@@ -3,9 +3,7 @@
 ## Purpose
 
 TBD – Navigation and screen-rendering logic for project setup and dashboard display.
-
 ## Requirements
-
 ### Requirement: Inline project setup and active project dashboard rendering
 
 The system SHALL not redirect the user to a separate login or authentication route group. Instead, the application root routes directly to the dashboard screen. If no project is selected (`currentProject` is null), the dashboard screen SHALL render the project creation/selection component in place. Once a project is created or selected, the dashboard screen SHALL automatically render the active project's task list.
@@ -66,3 +64,24 @@ activate it immediately and close the switcher.
 - **WHEN** the user chooses "Nuevo Proyecto", enters a name and confirms
 - **THEN** the new project is created and becomes active
 - **AND** the switcher closes and the dashboard shows the new project
+
+### Requirement: Tasks are editable from the dashboard
+
+A task SHALL be editable through a dedicated edit route reachable from the
+dashboard. The edit screen SHALL pre-fill the task's current title, description,
+and reminder (with the reminder section enabled when the task has one). Saving
+SHALL apply the edit and return to the dashboard.
+
+#### Scenario: Opening a task's edit screen
+
+- **GIVEN** a task on the dashboard
+- **WHEN** the user opens that task's edit affordance
+- **THEN** the edit screen shows the task's current title, description, and reminder state
+
+#### Scenario: Saving an edit returns to the dashboard
+
+- **GIVEN** the edit screen for a task
+- **WHEN** the user saves a valid change
+- **THEN** the change is applied
+- **AND** the app returns to the dashboard
+

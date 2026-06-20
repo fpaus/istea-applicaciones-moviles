@@ -3,10 +3,16 @@ import { Input } from "@/src/components/ui/Input";
 import { NumberInput } from "@/src/components/ui/NumberInput";
 import { Typography } from "@/src/components/ui/Typography";
 import { Colors, Utility } from "@/src/constants/theme";
-import { useAddTaskForm } from "@/src/hooks/useAddTaskForm";
+import { useEditTaskForm } from "@/src/hooks/useEditTaskForm";
+import { useLocalSearchParams } from "expo-router";
 import { ScrollView, StyleSheet, Switch, View } from "react-native";
 
-export default function AddScreen() {
+export default function EditScreen() {
+  const { projectId, taskId } = useLocalSearchParams<{
+    projectId: string;
+    taskId: string;
+  }>();
+
   const {
     title,
     setTitle,
@@ -22,12 +28,12 @@ export default function AddScreen() {
     setRepeats,
     isFormValid,
     handleSave,
-  } = useAddTaskForm();
+  } = useEditTaskForm(projectId || "", taskId || "");
 
   return (
     <ScrollView style={styles.container}>
       <Typography variant="h2" style={styles.title}>
-        Crear Nueva Tarea
+        Editar Tarea
       </Typography>
 
       <Input
@@ -88,7 +94,7 @@ export default function AddScreen() {
       )}
 
       <Button
-        title="Guardar Tarea"
+        title="Guardar Cambios"
         onPress={handleSave}
         style={styles.saveBtn}
         disabled={!isFormValid}

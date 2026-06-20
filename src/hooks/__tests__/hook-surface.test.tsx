@@ -13,9 +13,11 @@ const activeTask: Task = {
   id: "1",
   title: "Active",
   description: "",
-  time: { hour: 8, minute: 0 },
-  repeats: false,
-  notificationId: "n1",
+  notification: {
+    time: { hour: 8, minute: 0 },
+    repeats: false,
+    notificationId: "n1",
+  },
   completed: false,
   createdAt: 0,
 };
@@ -23,7 +25,7 @@ const doneTask: Task = {
   ...activeTask,
   id: "2",
   title: "Done",
-  notificationId: null,
+  notification: null,
   completed: true,
   createdAt: 0,
 };
@@ -140,8 +142,11 @@ describe("useTaskActions", () => {
       await result.current.addTask({
         title: "Task 1",
         description: "Desc",
-        time: { hour: 10, minute: 0 },
-        repeats: false,
+        notification: {
+          time: { hour: 10, minute: 0 },
+          repeats: false,
+          notificationId: null,
+        },
       });
     });
     expect(useTaskStore.getState().tasks["p1"]).toHaveLength(1);
@@ -164,8 +169,11 @@ describe("useTaskActions", () => {
       await result.current.addTask({
         title: "Task 2",
         description: "",
-        time: { hour: 11, minute: 0 },
-        repeats: true,
+        notification: {
+          time: { hour: 11, minute: 0 },
+          repeats: true,
+          notificationId: null,
+        },
       });
     });
     await act(async () => {

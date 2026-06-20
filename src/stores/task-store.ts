@@ -16,11 +16,20 @@ export function selectActive(tasks: Task[]): Task[] {
   return tasks
     .filter((t) => !t.completed)
     .sort((a, b) => {
+      const hasA = !!a.notification;
+      const hasB = !!b.notification;
+
+      if (hasA && !hasB) return -1;
+      if (!hasA && hasB) return 1;
+      if (!hasA && !hasB) {
+        return a.createdAt - b.createdAt;
+      }
+
       const now = new Date();
       const currentTotalMinutes = now.getHours() * 60 + now.getMinutes();
 
-      const timeA = a.time.hour * 60 + a.time.minute;
-      const timeB = b.time.hour * 60 + b.time.minute;
+      const timeA = a.notification!.time.hour * 60 + a.notification!.time.minute;
+      const timeB = b.notification!.time.hour * 60 + b.notification!.time.minute;
 
       const adjustedA = timeA < currentTotalMinutes ? timeA + 1440 : timeA;
       const adjustedB = timeB < currentTotalMinutes ? timeB + 1440 : timeB;
@@ -63,30 +72,36 @@ export const createTaskState =
       // `projectName` is injected by the caller so the store stays decoupled
       // from the project store (fully isolated unit tests).
       let notificationId: string | null = null;
-      try {
-        const displayTitle = projectName
-          ? `[${projectName}] ${data.title}`
-          : data.title;
-        notificationId = await deps.notifications.scheduleNotification(
-          displayTitle,
-          data.description,
-          data.time,
-          data.repeats,
-        );
-      } catch (error) {
-        console.error(
-          "[task-store] Failed to schedule notification:",
-          error,
-        );
+      if (data.notification) {
+        try {
+          const displayTitle = projectName
+            ? `[${projectName}] ${data.title}`
+            : data.title;
+          notificationId = await deps.notifications.scheduleNotification(
+            displayTitle,
+            data.description,
+            data.notification.time,
+            data.notification.repeats,
+          );
+        } catch (error) {
+          console.error(
+            "[task-store] Failed to schedule notification:",
+            error,
+          );
+        }
       }
 
       const newTask: Task = {
         id: generateUUID(),
         title: data.title,
         description: data.description,
-        time: data.time,
-        repeats: data.repeats,
-        notificationId,
+        notification: data.notification
+          ? {
+              time: data.notification.time,
+              repeats: data.notification.repeats,
+              notificationId,
+            }
+          : null,
         completed: false,
         createdAt: Date.now(),
       };
@@ -103,7 +118,7 @@ export const createTaskState =
     deleteTask: async (projectId, id) => {
       const projectTasks = get().tasks[projectId] || [];
       const item = projectTasks.find((t) => t.id === id);
-      await safeCancel(item?.notificationId ?? null);
+      await safeCancel(item?.notification?.notificationId ?? null);
       set({
         tasks: {
           ...get().tasks,
@@ -112,15 +127,147 @@ export const createTaskState =
       });
     },
 
+    updateTask: async (projectId, id, patch, projectName) => {
+      const projectTasks = get().tasks[projectId] || [];
+      const taskIndex = projectTasks.findIndex((t) => t.id === id);
+      if (taskIndex === -1) return;
+
+      const oldTask = projectTasks[taskIndex];
+      const nextTitle = patch.title !== undefined ? patch.title : oldTask.title;
+      const nextDescription =
+        patch.description !== undefined
+          ? patch.description
+          : oldTask.description;
+
+      let nextNotification = oldTask.notification;
+
+      if (patch.notification !== undefined) {
+        const oldNotif = oldTask.notification;
+        const newNotif = patch.notification;
+
+        if (!oldNotif && newNotif) {
+          // none -> set
+          let notificationId: string | null = null;
+          try {
+            const displayTitle = projectName
+              ? `[${projectName}] ${nextTitle}`
+              : nextTitle;
+            notificationId = await deps.notifications.scheduleNotification(
+              displayTitle,
+              nextDescription,
+              newNotif.time,
+              newNotif.repeats,
+            );
+          } catch (error) {
+            console.error(
+              "[task-store] Failed to schedule notification:",
+              error,
+            );
+          }
+          nextNotification = {
+            time: newNotif.time,
+            repeats: newNotif.repeats,
+            notificationId,
+          };
+        } else if (oldNotif && !newNotif) {
+          // set -> none
+          await safeCancel(oldNotif.notificationId);
+          nextNotification = null;
+        } else if (oldNotif && newNotif) {
+          // set -> changed
+          const timeChanged =
+            oldNotif.time.hour !== newNotif.time.hour ||
+            oldNotif.time.minute !== newNotif.time.minute;
+          const repeatsChanged = oldNotif.repeats !== newNotif.repeats;
+          const titleOrDescChanged =
+            nextTitle !== oldTask.title || nextDescription !== oldTask.description;
+
+          if (timeChanged || repeatsChanged || titleOrDescChanged) {
+            await safeCancel(oldNotif.notificationId);
+            let notificationId: string | null = null;
+            try {
+              const displayTitle = projectName
+                ? `[${projectName}] ${nextTitle}`
+                : nextTitle;
+              notificationId = await deps.notifications.scheduleNotification(
+                displayTitle,
+                nextDescription,
+                newNotif.time,
+                newNotif.repeats,
+              );
+            } catch (error) {
+              console.error(
+                "[task-store] Failed to schedule notification:",
+                error,
+              );
+            }
+            nextNotification = {
+              time: newNotif.time,
+              repeats: newNotif.repeats,
+              notificationId,
+            };
+          }
+        }
+      } else {
+        // patch.notification is undefined, check if title/description changed for rescheduling
+        const oldNotif = oldTask.notification;
+        if (
+          oldNotif &&
+          (nextTitle !== oldTask.title || nextDescription !== oldTask.description)
+        ) {
+          await safeCancel(oldNotif.notificationId);
+          let notificationId: string | null = null;
+          try {
+            const displayTitle = projectName
+              ? `[${projectName}] ${nextTitle}`
+              : nextTitle;
+            notificationId = await deps.notifications.scheduleNotification(
+              displayTitle,
+              nextDescription,
+              oldNotif.time,
+              oldNotif.repeats,
+            );
+          } catch (error) {
+            console.error(
+              "[task-store] Failed to schedule notification:",
+              error,
+            );
+          }
+          nextNotification = {
+            time: oldNotif.time,
+            repeats: oldNotif.repeats,
+            notificationId,
+          };
+        }
+      }
+
+      const updatedTask: Task = {
+        ...oldTask,
+        title: nextTitle,
+        description: nextDescription,
+        notification: nextNotification,
+      };
+
+      const nextTasks = [...projectTasks];
+      nextTasks[taskIndex] = updatedTask;
+
+      set({
+        tasks: {
+          ...get().tasks,
+          [projectId]: nextTasks,
+        },
+      });
+    },
+
     markCompleted: async (projectId, id) => {
       const projectTasks = get().tasks[projectId] || [];
       const item = projectTasks.find((t) => t.id === id);
-      await safeCancel(item?.notificationId ?? null);
+      await safeCancel(item?.notification?.notificationId ?? null);
       set({
         tasks: {
           ...get().tasks,
           [projectId]: projectTasks.map((t) =>
-            t.id === id ? { ...t, completed: true, notificationId: null } : t,
+            t.id === id ? { ...t, completed: true, notification: null } : t,
           ),
         },
       });
@@ -129,7 +276,7 @@ export const createTaskState =
     clearAll: async (projectId) => {
       const projectTasks = get().tasks[projectId] || [];
       for (const t of projectTasks) {
-        await safeCancel(t.notificationId);
+        await safeCancel(t.notification?.notificationId ?? null);
       }
       set({
         tasks: {
@@ -143,7 +290,7 @@ export const createTaskState =
       const projectTasks = get().tasks[projectId];
       if (!projectTasks) return;
       for (const t of projectTasks) {
-        await safeCancel(t.notificationId);
+        await safeCancel(t.notification?.notificationId ?? null);
       }
       // Immutably drop the project's key so subscribers re-render.
       const { [projectId]: _removed, ...rest } = get().tasks;
@@ -156,10 +303,16 @@ export const createTaskState =
       let found = false;
       const updatedTasks: Record<string, Task[]> = {};
       for (const [projectId, list] of Object.entries(get().tasks)) {
-        const idx = list.findIndex((t) => t.notificationId === notificationId);
+        const idx = list.findIndex((t) => t.notification?.notificationId === notificationId);
         if (!found && idx !== -1) {
           const nextList = [...list];
-          nextList[idx] = { ...nextList[idx], notificationId: null };
+          const taskToUpdate = nextList[idx];
+          nextList[idx] = {
+            ...taskToUpdate,
+            notification: taskToUpdate.notification
+              ? { ...taskToUpdate.notification, notificationId: null }
+              : null,
+          };
           updatedTasks[projectId] = nextList;
           found = true;
         } else {

@@ -18,8 +18,11 @@ function makeStore(notifications: NotificationScheduler): StoreApi<TaskState> {
 const input: NewTask = {
   title: "Drink water",
   description: "",
-  time: { hour: 9, minute: 0 },
-  repeats: false,
+  notification: {
+    time: { hour: 9, minute: 0 },
+    repeats: false,
+    notificationId: null,
+  },
 };
 
 describe("task store — resilience", () => {
@@ -31,7 +34,7 @@ describe("task store — resilience", () => {
     await store.getState().addTask("project-1", "Work", input);
 
     expect(store.getState().tasks["project-1"]).toHaveLength(1);
-    expect(store.getState().tasks["project-1"][0].notificationId).toBeNull();
+    expect(store.getState().tasks["project-1"][0].notification?.notificationId).toBeNull();
   });
 
   it("still adds the task (null id) and does not reject when the scheduler throws", async () => {
@@ -45,7 +48,7 @@ describe("task store — resilience", () => {
     await expect(store.getState().addTask("project-1", "Work", input)).resolves.toBeUndefined();
 
     expect(store.getState().tasks["project-1"]).toHaveLength(1);
-    expect(store.getState().tasks["project-1"][0].notificationId).toBeNull();
+    expect(store.getState().tasks["project-1"][0].notification?.notificationId).toBeNull();
     expect(errorSpy).toHaveBeenCalled();
     errorSpy.mockRestore();
   });

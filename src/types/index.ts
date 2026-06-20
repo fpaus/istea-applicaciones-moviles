@@ -11,17 +11,14 @@ export interface Project {
 export interface NewTask {
   title: string;
   description: string;
-  time: Time;
-  repeats: boolean;
+  notification?: { time: Time; repeats: boolean; notificationId: string | null } | null;
 }
 
 export interface Task {
   id: string;
   title: string;
   description: string;
-  time: Time;
-  repeats: boolean;
-  notificationId: string | null;
+  notification?: { time: Time; repeats: boolean; notificationId: string | null } | null;
   completed: boolean;
   createdAt: number;
 }

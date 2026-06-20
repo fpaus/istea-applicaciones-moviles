@@ -18,8 +18,11 @@ function makeStore(notifications: NotificationScheduler): StoreApi<TaskState> {
 const sampleInput: NewTask = {
   title: "Drink water",
   description: "Stay hydrated",
-  time: { hour: 9, minute: 0 },
-  repeats: true,
+  notification: {
+    time: { hour: 9, minute: 0 },
+    repeats: true,
+    notificationId: null,
+  },
 };
 
 describe("task store", () => {
@@ -38,7 +41,27 @@ describe("task store", () => {
     );
     expect(tasks["project-1"]).toHaveLength(1);
     expect(tasks["project-1"][0].title).toBe("Drink water");
-    expect(tasks["project-1"][0].notificationId).toBe("notif-1");
+    expect(tasks["project-1"][0].notification?.notificationId).toBe("notif-1");
+    expect(tasks["project-1"][0].completed).toBe(false);
+  });
+
+  it("addTask with no reminder stores notification: null and does NOT call the scheduler", async () => {
+    const notifications = makeFakeNotifications();
+    const store = makeStore(notifications);
+
+    const inputNoReminder: NewTask = {
+      title: "No reminder task",
+      description: "Just a checklist item",
+      notification: null,
+    };
+
+    await store.getState().addTask("project-1", "Work", inputNoReminder);
+
+    const { tasks } = store.getState();
+    expect(notifications.scheduleNotification).not.toHaveBeenCalled();
+    expect(tasks["project-1"]).toHaveLength(1);
+    expect(tasks["project-1"][0].title).toBe("No reminder task");
+    expect(tasks["project-1"][0].notification).toBeNull();
     expect(tasks["project-1"][0].completed).toBe(false);
   });
 
@@ -80,7 +103,7 @@ describe("task store", () => {
     expect(notifications.cancelNotification).toHaveBeenCalledWith("notif-1");
     const task = store.getState().tasks["project-1"][0];
     expect(task.completed).toBe(true);
-    expect(task.notificationId).toBeNull();
+    expect(task.notification).toBeNull();
   });
 
   it("clearAll cancels all notifications and empties the project's list", async () => {
@@ -106,8 +129,8 @@ describe("task store", () => {
 
     store.getState().clearNotificationId("notif-A");
 
-    expect(store.getState().tasks["project-1"][0].notificationId).toBeNull();
-    expect(store.getState().tasks["project-2"][0].notificationId).toBe("notif-B");
+    expect(store.getState().tasks["project-1"][0].notification?.notificationId).toBeNull();
+    expect(store.getState().tasks["project-2"][0].notification?.notificationId).toBe("notif-B");
   });
 
   it("clearNotificationId updates immutably (new array ref, original objects untouched)", async () => {
@@ -123,8 +146,8 @@ describe("task store", () => {
 
     const afterList = store.getState().tasks["project-1"];
     expect(afterList).not.toBe(beforeList); // new array reference
-    expect(afterList[0].notificationId).toBeNull();
-    expect(beforeTask.notificationId).toBe("notif-A"); // original object not mutated
+    expect(afterList[0].notification?.notificationId).toBeNull();
+    expect(beforeTask.notification?.notificationId).toBe("notif-A"); // original object not mutated
   });
 
   it("removeProjectTasks cancels each task's notification and drops the project's key", async () => {
@@ -221,5 +244,210 @@ describe("task store", () => {
       { hour: 9, minute: 0 },
       true,
     );
+  });
+
+  describe("updateTask", () => {
+    it("edits title and description without changing notification if not in patch", async () => {
+      const notifications = makeFakeNotifications();
+      const store = makeStore(notifications);
+
+      await store.getState().addTask("project-1", "Work", sampleInput);
+      const id = store.getState().tasks["project-1"][0].id;
+
+      await store.getState().updateTask("project-1", id, {
+        title: "New Title",
+        description: "New Description",
+      });
+
+      const task = store.getState().tasks["project-1"][0];
+      expect(task.title).toBe("New Title");
+      expect(task.description).toBe("New Description");
+      expect(task.notification?.notificationId).toBe("notif-1");
+    });
+
+    it("schedules a notification when adding a reminder to a task that had none (none -> set)", async () => {
+      const notifications = makeFakeNotifications();
+      const store = makeStore(notifications);
+
+      const noReminderTask: NewTask = {
+        title: "No reminder",
+        description: "",
+        notification: null,
+      };
+
+      await store.getState().addTask("project-1", "Work", noReminderTask);
+      const id = store.getState().tasks["project-1"][0].id;
+
+      notifications.scheduleNotification.mockResolvedValueOnce("notif-new");
+
+      await store.getState().updateTask("project-1", id, {
+        notification: {
+          time: { hour: 12, minute: 0 },
+          repeats: false,
+          notificationId: null,
+        },
+      }, "Work");
+
+      expect(notifications.scheduleNotification).toHaveBeenCalledWith(
+        "[Work] No reminder",
+        "",
+        { hour: 12, minute: 0 },
+        false,
+      );
+      const task = store.getState().tasks["project-1"][0];
+      expect(task.notification?.notificationId).toBe("notif-new");
+    });
+
+    it("cancels old and schedules new notification when changing reminder details (set -> changed)", async () => {
+      const notifications = makeFakeNotifications();
+      const store = makeStore(notifications);
+
+      await store.getState().addTask("project-1", "Work", sampleInput);
+      const id = store.getState().tasks["project-1"][0].id;
+
+      notifications.scheduleNotification.mockResolvedValueOnce("notif-new");
+
+      await store.getState().updateTask("project-1", id, {
+        notification: {
+          time: { hour: 10, minute: 0 },
+          repeats: false,
+          notificationId: null,
+        },
+      }, "Work");
+
+      expect(notifications.cancelNotification).toHaveBeenCalledWith("notif-1");
+      expect(notifications.scheduleNotification).toHaveBeenCalledWith(
+        "[Work] Drink water",
+        "Stay hydrated",
+        { hour: 10, minute: 0 },
+        false,
+      );
+      const task = store.getState().tasks["project-1"][0];
+      expect(task.notification?.notificationId).toBe("notif-new");
+    });
+
+    it("cancels notification and sets notification to null when removing a reminder (set -> none)", async () => {
+      const notifications = makeFakeNotifications();
+      const store = makeStore(notifications);
+
+      await store.getState().addTask("project-1", "Work", sampleInput);
+      const id = store.getState().tasks["project-1"][0].id;
+
+      await store.getState().updateTask("project-1", id, {
+        notification: null,
+      });
+
+      expect(notifications.cancelNotification).toHaveBeenCalledWith("notif-1");
+      const task = store.getState().tasks["project-1"][0];
+      expect(task.notification).toBeNull();
+    });
+
+    it("applies the edit even if notification cancellation fails (resilient)", async () => {
+      const notifications = makeFakeNotifications();
+      notifications.cancelNotification.mockRejectedValueOnce(new Error("cancel fail"));
+      const errorSpy = jest.spyOn(console, "error").mockImplementation(() => {});
+      const store = makeStore(notifications);
+
+      await store.getState().addTask("project-1", "Work", sampleInput);
+      const id = store.getState().tasks["project-1"][0].id;
+
+      await expect(
+        store.getState().updateTask("project-1", id, {
+          title: "Edited title",
+          notification: null,
+        }),
+      ).resolves.toBeUndefined();
+
+      expect(notifications.cancelNotification).toHaveBeenCalledWith("notif-1");
+      const task = store.getState().tasks["project-1"][0];
+      expect(task.title).toBe("Edited title");
+      expect(task.notification).toBeNull();
+
+      expect(errorSpy).toHaveBeenCalled();
+      errorSpy.mockRestore();
+    });
+
+    it("applies the edit even if scheduling a new notification fails (none -> set)", async () => {
+      const notifications = makeFakeNotifications();
+      notifications.scheduleNotification.mockRejectedValueOnce(new Error("schedule fail"));
+      const errorSpy = jest.spyOn(console, "error").mockImplementation(() => {});
+      const store = makeStore(notifications);
+
+      const noReminderTask: NewTask = {
+        title: "No reminder",
+        description: "",
+        notification: null,
+      };
+      await store.getState().addTask("project-1", "Work", noReminderTask);
+      const id = store.getState().tasks["project-1"][0].id;
+
+      await expect(
+        store.getState().updateTask("project-1", id, {
+          title: "Added reminder",
+          notification: {
+            time: { hour: 12, minute: 0 },
+            repeats: false,
+            notificationId: null,
+          },
+        }),
+      ).resolves.toBeUndefined();
+
+      const task = store.getState().tasks["project-1"][0];
+      expect(task.title).toBe("Added reminder");
+      expect(task.notification?.time).toEqual({ hour: 12, minute: 0 });
+      expect(task.notification?.notificationId).toBeNull();
+      expect(errorSpy).toHaveBeenCalled();
+      errorSpy.mockRestore();
+    });
+
+    it("applies the edit even if scheduling a changed notification fails (set -> changed)", async () => {
+      const notifications = makeFakeNotifications();
+      const errorSpy = jest.spyOn(console, "error").mockImplementation(() => {});
+      const store = makeStore(notifications);
+
+      await store.getState().addTask("project-1", "Work", sampleInput);
+      const id = store.getState().tasks["project-1"][0].id;
+
+      notifications.scheduleNotification.mockRejectedValueOnce(new Error("schedule fail"));
+
+      await expect(
+        store.getState().updateTask("project-1", id, {
+          notification: {
+            time: { hour: 10, minute: 0 },
+            repeats: false,
+            notificationId: null,
+          },
+        }),
+      ).resolves.toBeUndefined();
+
+      const task = store.getState().tasks["project-1"][0];
+      expect(task.notification?.time).toEqual({ hour: 10, minute: 0 });
+      expect(task.notification?.notificationId).toBeNull();
+      expect(errorSpy).toHaveBeenCalled();
+      errorSpy.mockRestore();
+    });
+
+    it("applies the edit even if rescheduling a notification on title change fails", async () => {
+      const notifications = makeFakeNotifications();
+      const errorSpy = jest.spyOn(console, "error").mockImplementation(() => {});
+      const store = makeStore(notifications);
+
+      await store.getState().addTask("project-1", "Work", sampleInput);
+      const id = store.getState().tasks["project-1"][0].id;
+
+      notifications.scheduleNotification.mockRejectedValueOnce(new Error("schedule fail"));
+
+      await expect(
+        store.getState().updateTask("project-1", id, {
+          title: "New Title",
+        }),
+      ).resolves.toBeUndefined();
+
+      const task = store.getState().tasks["project-1"][0];
+      expect(task.title).toBe("New Title");
+      expect(task.notification?.notificationId).toBeNull();
+      expect(errorSpy).toHaveBeenCalled();
+      errorSpy.mockRestore();
+    });
   });
 });

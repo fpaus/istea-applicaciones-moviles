@@ -14,8 +14,11 @@ function fakeNotifications(): NotificationScheduler {
 const input: NewTask = {
   title: "Persisted",
   description: "",
-  time: { hour: 7, minute: 30 },
-  repeats: false,
+  notification: {
+    time: { hour: 7, minute: 30 },
+    repeats: false,
+    notificationId: null,
+  },
 };
 
 const flush = () => new Promise((resolve) => setTimeout(resolve, 0));
@@ -56,9 +59,11 @@ describe("task store — persistence", () => {
       id: "seeded",
       title: "From storage",
       description: "",
-      time: { hour: 6, minute: 0 },
-      repeats: false,
-      notificationId: null,
+      notification: {
+        time: { hour: 6, minute: 0 },
+        repeats: false,
+        notificationId: null,
+      },
       completed: false,
       createdAt: 0,
     };

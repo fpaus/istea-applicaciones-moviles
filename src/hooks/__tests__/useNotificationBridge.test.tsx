@@ -40,9 +40,11 @@ describe("useNotificationBridge", () => {
             id: "1",
             title: "A",
             description: "",
-            time: { hour: 8, minute: 0 },
-            repeats: false,
-            notificationId: "n1",
+            notification: {
+              time: { hour: 8, minute: 0 },
+              repeats: false,
+              notificationId: "n1",
+            },
             completed: false,
             createdAt: 0,
           },
@@ -60,7 +62,7 @@ describe("useNotificationBridge", () => {
       mockState.receivedListener!({ request: { identifier: "n1" } });
     });
 
-    expect(useTaskStore.getState().tasks["project-1"][0].notificationId).toBeNull();
+    expect(useTaskStore.getState().tasks["project-1"][0].notification?.notificationId).toBeNull();
   });
 
   it("clears the matching task's notificationId when a user interacts with a notification response", () => {
@@ -74,7 +76,7 @@ describe("useNotificationBridge", () => {
       });
     });
 
-    expect(useTaskStore.getState().tasks["project-1"][0].notificationId).toBeNull();
+    expect(useTaskStore.getState().tasks["project-1"][0].notification?.notificationId).toBeNull();
   });
 
   it("removes both listeners on unmount", () => {

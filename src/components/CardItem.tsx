@@ -10,9 +10,15 @@ interface CardItemProps {
   item: Task;
   onMarkCompleted: (id: string) => void;
   onDelete: (id: string) => void;
+  onEdit?: (id: string) => void;
 }
 
-export function CardItem({ item, onMarkCompleted, onDelete }: CardItemProps) {
+export function CardItem({
+  item,
+  onMarkCompleted,
+  onDelete,
+  onEdit,
+}: CardItemProps) {
   return (
     <Card style={styles.card}>
       <View style={styles.cardHeader}>
@@ -29,17 +35,31 @@ export function CardItem({ item, onMarkCompleted, onDelete }: CardItemProps) {
         {item.description}
       </Typography>
       <View style={styles.cardFooter}>
-        <Typography variant="caption">
-          {item.repeats
-            ? `Todos los días a las ${item.time.hour.toString().padStart(2, "0")}:${item.time.minute.toString().padStart(2, "0")}`
-            : `A las ${item.time.hour.toString().padStart(2, "0")}:${item.time.minute.toString().padStart(2, "0")}`}
-        </Typography>
-        <Button
-          title="Eliminar"
-          variant="outline"
-          onPress={() => onDelete(item.id)}
-          style={styles.deleteBtn}
-        />
+        {item.notification ? (
+          <Typography variant="caption">
+            {item.notification.repeats
+              ? `Todos los días a las ${item.notification.time.hour.toString().padStart(2, "0")}:${item.notification.time.minute.toString().padStart(2, "0")}`
+              : `A las ${item.notification.time.hour.toString().padStart(2, "0")}:${item.notification.time.minute.toString().padStart(2, "0")}`}
+          </Typography>
+        ) : (
+          <View />
+        )}
+        <View style={styles.actionsContainer}>
+          {onEdit && (
+            <Button
+              title="Editar"
+              variant="outline"
+              onPress={() => onEdit(item.id)}
+              style={styles.editBtn}
+            />
+          )}
+          <Button
+            title="Eliminar"
+            variant="outline"
+            onPress={() => onDelete(item.id)}
+            style={styles.deleteBtn}
+          />
+        </View>
       </View>
     </Card>
   );
@@ -62,6 +82,14 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
+  },
+  actionsContainer: {
+    flexDirection: "row",
+    gap: Utility.spacing.s,
+  },
+  editBtn: {
+    paddingVertical: 6,
+    paddingHorizontal: 12,
   },
   deleteBtn: {
     paddingVertical: 6,
