@@ -1,7 +1,8 @@
 import { CardItem } from "@/src/components/CardItem";
+import { ProjectSelector } from "@/src/components/ProjectSelector";
 import { Typography } from "@/src/components/ui/Typography";
 import { Colors, Utility } from "@/src/constants/theme";
-import { useReminders } from "@/src/hooks/useReminders";
+import { useDashboard } from "@/src/hooks/useDashboard";
 import { useRouter } from "expo-router";
 import {
   SectionList,
@@ -12,20 +13,47 @@ import {
 } from "react-native";
 
 export default function Index() {
-  const { activeReminders, completedReminders, markCompleted, deleteReminder } =
-    useReminders();
+  const {
+    isProjectSelected,
+    activeTasks,
+    completedTasks,
+    markCompleted,
+    deleteTask,
+    hasPermission,
+    requestPermission,
+  } = useDashboard();
   const router = useRouter();
 
-  const sections = [];
-  if (activeReminders.length > 0) {
-    sections.push({ title: "Active Reminders", data: activeReminders });
+  if (!isProjectSelected) {
+    return (
+      <View style={styles.selectorContainer}>
+        <ProjectSelector compact={false} />
+      </View>
+    );
   }
-  if (completedReminders.length > 0) {
-    sections.push({ title: "Completed", data: completedReminders });
+
+  const sections = [];
+  if (activeTasks.length > 0) {
+    sections.push({ title: "Tareas Activas", data: activeTasks });
+  }
+  if (completedTasks.length > 0) {
+    sections.push({ title: "Completadas", data: completedTasks });
   }
 
   return (
     <View style={styles.container}>
+      {hasPermission === false && (
+        <TouchableOpacity
+          style={styles.warningBanner}
+          onPress={requestPermission}
+          activeOpacity={0.9}
+        >
+          <Typography style={styles.warningText}>
+            ⚠️ Las notificaciones están desactivadas. Las tareas no sonarán. Toca aquí para activarlas.
+          </Typography>
+        </TouchableOpacity>
+      )}
+
       <SectionList
         sections={sections}
         keyExtractor={(item) => item.id}
@@ -37,14 +65,14 @@ export default function Index() {
         )}
         ListEmptyComponent={
           <Typography style={styles.empty}>
-            No reminders yet. Add one!
+            No hay tareas todavía. ¡Agrega una!
           </Typography>
         }
         renderItem={({ item }) => (
           <CardItem
             item={item}
             onMarkCompleted={markCompleted}
-            onDelete={deleteReminder}
+            onDelete={deleteTask}
           />
         )}
       />
@@ -64,6 +92,21 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: Colors.light.background,
+  },
+  warningBanner: {
+    backgroundColor: "#FFF3CD",
+    padding: Utility.spacing.m,
+    borderBottomWidth: 1,
+    borderBottomColor: "#FFEBA0",
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  warningText: {
+    color: "#856404",
+    fontSize: 14,
+    fontWeight: "600",
+    textAlign: "center",
   },
   list: {
     padding: Utility.spacing.m,
@@ -98,5 +141,10 @@ const styles = StyleSheet.create({
     color: "#FFFFFF",
     lineHeight: 36,
     fontWeight: "300",
+  },
+  selectorContainer: {
+    flex: 1,
+    justifyContent: "center",
+    backgroundColor: Colors.light.background,
   },
 });

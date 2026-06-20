@@ -22,8 +22,8 @@ export class NotificationService {
       );
     }
     if (Platform.OS === "android") {
-      await Notifications.setNotificationChannelAsync("reminders", {
-        name: "Reminders",
+      await Notifications.setNotificationChannelAsync("tasks", {
+        name: "Tasks",
         importance: Notifications.AndroidImportance.HIGH,
         vibrationPattern: [0, 250, 250, 250],
         lightColor: "#6C63FF",
@@ -40,6 +40,11 @@ export class NotificationService {
       finalStatus = status;
     }
     return finalStatus === "granted";
+  }
+
+  async checkPermission(): Promise<boolean> {
+    const { status } = await Notifications.getPermissionsAsync();
+    return status === "granted";
   }
 
   async scheduleNotification(
@@ -77,7 +82,7 @@ export class NotificationService {
         title,
         body,
         sound: "default",
-        data: { type: "reminder" },
+        data: { type: "task" },
       },
       trigger,
     });

@@ -1,25 +1,24 @@
-import { useAuth } from "@/src/hooks/useAuth";
+import { useProject } from "@/src/hooks/useProject";
+import { ProjectSelector } from "@/src/components/ProjectSelector";
 import {
   DrawerContentScrollView,
   DrawerItemList,
 } from "@react-navigation/drawer";
-import { Redirect } from "expo-router";
 import { Drawer } from "expo-router/drawer";
-import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 export default function AppLayout() {
-  const { isLoggedIn, logout, loading } = useAuth();
+  const { isProjectSelected, loading } = useProject();
   const insets = useSafeAreaInsets();
 
   if (loading) return null;
 
-  if (!isLoggedIn) {
-    return <Redirect href="/login" />;
-  }
-
   return (
     <Drawer
+      screenOptions={{
+        swipeEnabled: isProjectSelected,
+      }}
       drawerContent={(props) => (
         <View style={styles.drawerContainer}>
           <DrawerContentScrollView {...props}>
@@ -31,12 +30,7 @@ export default function AppLayout() {
               { paddingBottom: insets.bottom + 20 },
             ]}
           >
-            <TouchableOpacity
-              style={styles.logoutButton}
-              onPress={() => logout()}
-            >
-              <Text style={styles.logoutText}>Logout</Text>
-            </TouchableOpacity>
+            <ProjectSelector compact={true} />
           </View>
         </View>
       )}
@@ -44,20 +38,23 @@ export default function AppLayout() {
       <Drawer.Screen
         name="index"
         options={{
-          drawerLabel: "Dashboard",
-          title: "Dashboard",
+          drawerLabel: "Tablero",
+          title: "Tablero",
+          headerShown: isProjectSelected,
         }}
       />
       <Drawer.Screen
         name="add"
         options={{
           drawerItemStyle: { display: "none" }, // Hide from drawer
-          title: "Add Reminder",
+          title: "Agregar Tarea",
+          headerShown: isProjectSelected,
         }}
       />
     </Drawer>
   );
 }
+
 
 const styles = StyleSheet.create({
   drawerContainer: {
@@ -67,21 +64,5 @@ const styles = StyleSheet.create({
     padding: 20,
     borderTopWidth: 1,
     borderTopColor: "#e0e0e0",
-  },
-  logoutButton: {
-    backgroundColor: "#ff3b30",
-    paddingVertical: 14,
-    borderRadius: 8,
-    alignItems: "center",
-    shadowColor: "#ff3b30",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 6,
-    elevation: 4,
-  },
-  logoutText: {
-    color: "#ffffff",
-    fontSize: 16,
-    fontWeight: "bold",
   },
 });

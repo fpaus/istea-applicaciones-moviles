@@ -1,13 +1,13 @@
-import { useAuthStore } from "../stores/auth-store";
-import { useReminderStore } from "../stores/reminder-store";
+import { useProjectStore } from "../stores/project-store";
+import { useTaskStore } from "../stores/task-store";
 
 /**
  * True only once both persisted stores have finished rehydrating from
- * AsyncStorage. The root layout gates rendering on this so declarative auth
+ * AsyncStorage. The root layout gates rendering on this so declarative
  * redirects evaluate against hydrated state (no login-screen flash).
  */
 export function useHydrated(): boolean {
-  const authHydrated = useAuthStore((s) => s.hasHydrated);
-  const remindersHydrated = useReminderStore((s) => s.hasHydrated);
-  return authHydrated && remindersHydrated;
+  const projectHydrated = useProjectStore((s) => s.hasHydrated);
+  const tasksHydrated = useTaskStore((s) => s.hasHydrated);
+  return projectHydrated && tasksHydrated;
 }

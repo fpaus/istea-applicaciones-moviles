@@ -1,13 +1,13 @@
 import { useEffect } from "react";
 import { notificationService } from "../services/notifications";
-import { useReminderStore } from "../stores/reminder-store";
+import { useTaskStore } from "../stores/task-store";
 
 /**
  * Event bridge for the OS→store direction: when a scheduled notification fires,
- * clear the `notificationId` of its reminder. Mounted once at the app root.
+ * clear the `notificationId` of its task. Mounted once at the app root.
  */
 export function useNotificationBridge() {
-  const clearNotificationId = useReminderStore((s) => s.clearNotificationId);
+  const clearNotificationId = useTaskStore((s) => s.clearNotificationId);
 
   useEffect(() => {
     const receivedSubscription = notificationService.addNotificationReceivedListener(

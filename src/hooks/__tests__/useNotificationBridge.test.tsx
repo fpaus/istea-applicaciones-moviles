@@ -1,5 +1,5 @@
 import { act, renderHook } from "@testing-library/react-native";
-import { useReminderStore } from "../../stores/reminder-store";
+import { useTaskStore } from "../../stores/task-store";
 import { useNotificationBridge } from "../useNotificationBridge";
 
 const mockState: {
@@ -33,23 +33,25 @@ describe("useNotificationBridge", () => {
     mockState.receivedListener = null;
     mockState.responseListener = null;
     mockRemove.mockClear();
-    useReminderStore.setState({
-      reminders: [
-        {
-          id: "1",
-          title: "A",
-          description: "",
-          time: { hour: 8, minute: 0 },
-          repeats: false,
-          notificationId: "n1",
-          completed: false,
-          createdAt: 0,
-        },
-      ],
+    useTaskStore.setState({
+      tasks: {
+        "project-1": [
+          {
+            id: "1",
+            title: "A",
+            description: "",
+            time: { hour: 8, minute: 0 },
+            repeats: false,
+            notificationId: "n1",
+            completed: false,
+            createdAt: 0,
+          },
+        ],
+      },
     });
   });
 
-  it("clears the matching reminder's notificationId when a notification fires in foreground", () => {
+  it("clears the matching task's notificationId when a notification fires in foreground", () => {
     renderHook(() => useNotificationBridge());
 
     expect(mockState.receivedListener).toBeInstanceOf(Function);
@@ -58,10 +60,10 @@ describe("useNotificationBridge", () => {
       mockState.receivedListener!({ request: { identifier: "n1" } });
     });
 
-    expect(useReminderStore.getState().reminders[0].notificationId).toBeNull();
+    expect(useTaskStore.getState().tasks["project-1"][0].notificationId).toBeNull();
   });
 
-  it("clears the matching reminder's notificationId when a user interacts with a notification response", () => {
+  it("clears the matching task's notificationId when a user interacts with a notification response", () => {
     renderHook(() => useNotificationBridge());
 
     expect(mockState.responseListener).toBeInstanceOf(Function);
@@ -72,7 +74,7 @@ describe("useNotificationBridge", () => {
       });
     });
 
-    expect(useReminderStore.getState().reminders[0].notificationId).toBeNull();
+    expect(useTaskStore.getState().tasks["project-1"][0].notificationId).toBeNull();
   });
 
   it("removes both listeners on unmount", () => {

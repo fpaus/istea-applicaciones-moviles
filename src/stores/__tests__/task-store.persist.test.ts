@@ -1,7 +1,7 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { createReminderStore } from "../reminder-store";
+import { createTaskStore } from "../task-store";
 import { NotificationScheduler } from "../types";
-import { NewReminder, Reminder } from "../../types";
+import { NewTask, Task } from "../../types";
 
 function fakeNotifications(): NotificationScheduler {
   return {
@@ -11,7 +11,7 @@ function fakeNotifications(): NotificationScheduler {
   };
 }
 
-const input: NewReminder = {
+const input: NewTask = {
   title: "Persisted",
   description: "",
   time: { hour: 7, minute: 30 },
@@ -20,7 +20,7 @@ const input: NewReminder = {
 
 const flush = () => new Promise((resolve) => setTimeout(resolve, 0));
 
-describe("reminder store — persistence", () => {
+describe("task store — persistence", () => {
   beforeEach(async () => {
     await AsyncStorage.clear();
     jest.clearAllMocks();
@@ -28,31 +28,31 @@ describe("reminder store — persistence", () => {
 
   it("writes the store key to AsyncStorage when an action mutates state", async () => {
     const setItem = jest.spyOn(AsyncStorage, "setItem");
-    const store = createReminderStore({ notifications: fakeNotifications() });
+    const store = createTaskStore({ notifications: fakeNotifications() });
 
-    await store.getState().addReminder(input);
+    await store.getState().addTask("project-1", "Work", input);
     await flush();
 
     expect(setItem).toHaveBeenCalledWith(
-      "reminder-store",
+      "task-store",
       expect.stringContaining("Persisted"),
     );
   });
 
-  it("persists only the reminders slice, not transient flags", async () => {
-    const store = createReminderStore({ notifications: fakeNotifications() });
-    await store.getState().addReminder(input);
+  it("persists only the tasks slice, not transient flags", async () => {
+    const store = createTaskStore({ notifications: fakeNotifications() });
+    await store.getState().addTask("project-1", "Work", input);
     await flush();
 
-    const raw = await AsyncStorage.getItem("reminder-store");
+    const raw = await AsyncStorage.getItem("task-store");
     const parsed = JSON.parse(raw as string);
 
-    expect(parsed.state).toHaveProperty("reminders");
+    expect(parsed.state).toHaveProperty("tasks");
     expect(parsed.state).not.toHaveProperty("hasHydrated");
   });
 
-  it("rehydrates reminders from AsyncStorage and flips hasHydrated true", async () => {
-    const stored: Reminder = {
+  it("rehydrates tasks from AsyncStorage and flips hasHydrated true", async () => {
+    const stored: Task = {
       id: "seeded",
       title: "From storage",
       description: "",
@@ -63,14 +63,14 @@ describe("reminder store — persistence", () => {
       createdAt: 0,
     };
     await AsyncStorage.setItem(
-      "reminder-store",
-      JSON.stringify({ state: { reminders: [stored] }, version: 0 }),
+      "task-store",
+      JSON.stringify({ state: { tasks: { "project-1": [stored] } }, version: 0 }),
     );
 
-    const store = createReminderStore({ notifications: fakeNotifications() });
+    const store = createTaskStore({ notifications: fakeNotifications() });
     await store.persist.rehydrate();
 
-    expect(store.getState().reminders.map((r) => r.id)).toEqual(["seeded"]);
+    expect(store.getState().tasks["project-1"].map((t) => t.id)).toEqual(["seeded"]);
     expect(store.getState().hasHydrated).toBe(true);
   });
 });

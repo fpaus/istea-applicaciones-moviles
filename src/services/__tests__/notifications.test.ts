@@ -1,11 +1,17 @@
 import * as Notifications from "expo-notifications";
+import { Platform } from "react-native";
+import * as Device from "expo-device";
 import { NotificationService } from "../notifications";
+
+
+const initialHandlerCalls = [...(Notifications.setNotificationHandler as jest.Mock).mock.calls];
 
 const schedule = Notifications.scheduleNotificationAsync as jest.Mock;
 const getPermissions = Notifications.getPermissionsAsync as jest.Mock;
 const requestPermissions = Notifications.requestPermissionsAsync as jest.Mock;
 
 describe("NotificationService.scheduleNotification", () => {
+
   let service: NotificationService;
 
   beforeAll(() => {
@@ -79,7 +85,41 @@ describe("NotificationService.scheduleNotification", () => {
     expect(schedule).toHaveBeenCalled();
     expect(result).toBe("mock-notification-id");
   });
+
+  it("sets the tasks channel on Android during requestPermission", async () => {
+    const setChannel = Notifications.setNotificationChannelAsync as jest.Mock;
+    const originalOS = Platform.OS;
+    Object.defineProperty(Platform, "OS", { get: () => "android", configurable: true });
+
+    await service.requestPermission();
+
+    expect(setChannel).toHaveBeenCalledWith("tasks", {
+      name: "Tasks",
+      importance: expect.any(Number),
+      vibrationPattern: expect.any(Array),
+      lightColor: expect.any(String),
+      sound: "default",
+    });
+
+    Object.defineProperty(Platform, "OS", { get: () => originalOS, configurable: true });
+  });
+
+  it("warns when running on emulator/simulator", async () => {
+    const originalIsDevice = Device.isDevice;
+    Object.defineProperty(Device, "isDevice", { value: false, configurable: true });
+    const warnSpy = jest.spyOn(console, "warn").mockImplementation(() => {});
+
+    await service.requestPermission();
+
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.stringContaining("Emulator detected"),
+    );
+
+    warnSpy.mockRestore();
+    Object.defineProperty(Device, "isDevice", { value: originalIsDevice, configurable: true });
+  });
 });
+
 
 describe("NotificationService cancellation & listeners", () => {
   const service = new NotificationService();
@@ -107,4 +147,51 @@ describe("NotificationService cancellation & listeners", () => {
       cb,
     );
   });
+
+  it("registers a response-received listener", () => {
+    const cb = jest.fn();
+    service.addNotificationResponseReceivedListener(cb);
+    expect(
+      Notifications.addNotificationResponseReceivedListener,
+    ).toHaveBeenCalledWith(cb);
+  });
+
+  it("sets the global notification handler options", async () => {
+    expect(initialHandlerCalls.length).toBeGreaterThan(0);
+    const config = initialHandlerCalls[0][0];
+    expect(config.handleNotification).toBeDefined();
+
+    const options = await config.handleNotification();
+    expect(options).toEqual({
+      shouldShowBanner: true,
+      shouldShowList: true,
+      shouldPlaySound: true,
+      shouldSetBadge: true,
+    });
+  });
 });
+
+describe("NotificationService.checkPermission", () => {
+  let service: NotificationService;
+
+  beforeEach(() => {
+    service = new NotificationService();
+  });
+
+  it("returns true when permission is granted", async () => {
+    getPermissions.mockResolvedValue({ status: "granted" });
+    const result = await service.checkPermission();
+    expect(result).toBe(true);
+    expect(getPermissions).toHaveBeenCalled();
+  });
+
+  it("returns false when permission is denied", async () => {
+    getPermissions.mockResolvedValue({ status: "denied" });
+    const result = await service.checkPermission();
+    expect(result).toBe(false);
+    expect(getPermissions).toHaveBeenCalled();
+  });
+});
+
+
+

@@ -4,10 +4,10 @@ import { Card } from "@/src/components/ui/Card";
 import { Typography } from "@/src/components/ui/Typography";
 import { Button } from "@/src/components/ui/Button";
 import { Colors, Utility } from "@/src/constants/theme";
-import { Reminder } from "@/src/types";
+import { Task } from "@/src/types";
 
 interface CardItemProps {
-  item: Reminder;
+  item: Task;
   onMarkCompleted: (id: string) => void;
   onDelete: (id: string) => void;
 }
@@ -30,16 +30,12 @@ export function CardItem({ item, onMarkCompleted, onDelete }: CardItemProps) {
       </Typography>
       <View style={styles.cardFooter}>
         <Typography variant="caption">
-          {item.time
-            ? item.repeats
-              ? `Every day at ${item.time.hour.toString().padStart(2, "0")}:${item.time.minute.toString().padStart(2, "0")}`
-              : `At ${item.time.hour.toString().padStart(2, "0")}:${item.time.minute.toString().padStart(2, "0")}`
-            : (item as any).hour !== undefined
-              ? `At ${(item as any).hour.toString().padStart(2, "0")}:${(item as any).minute.toString().padStart(2, "0")}`
-              : "Unknown time"}
+          {item.repeats
+            ? `Todos los días a las ${item.time.hour.toString().padStart(2, "0")}:${item.time.minute.toString().padStart(2, "0")}`
+            : `A las ${item.time.hour.toString().padStart(2, "0")}:${item.time.minute.toString().padStart(2, "0")}`}
         </Typography>
         <Button
-          title="Delete"
+          title="Eliminar"
           variant="outline"
           onPress={() => onDelete(item.id)}
           style={styles.deleteBtn}
