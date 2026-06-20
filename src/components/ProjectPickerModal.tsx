@@ -23,6 +23,18 @@ export interface ProjectPickerCreateFlow {
   onSubmit: () => void;
 }
 
+/** Optional per-row "manage projects" flow (inline rename + delete). */
+export interface ProjectPickerManageFlow {
+  editingId: string | null;
+  editingName: string;
+  error: string;
+  onStartEdit: (id: string, name: string) => void;
+  onChangeEditName: (text: string) => void;
+  onCancelEdit: () => void;
+  onSubmitEdit: () => void;
+  onDelete: (id: string, name: string) => void;
+}
+
 interface ProjectPickerModalProps {
   visible: boolean;
   projects: Project[];
@@ -31,6 +43,8 @@ interface ProjectPickerModalProps {
   onClose: () => void;
   /** When provided, the picker also offers a "+ Nuevo Proyecto" affordance. */
   create?: ProjectPickerCreateFlow;
+  /** When provided, each row gains rename/delete affordances. */
+  manage?: ProjectPickerManageFlow;
 }
 
 /**
@@ -45,6 +59,7 @@ export function ProjectPickerModal({
   onSelect,
   onClose,
   create,
+  manage,
 }: ProjectPickerModalProps) {
   return (
     <Modal
@@ -92,26 +107,82 @@ export function ProjectPickerModal({
             <FlatList
               data={projects}
               keyExtractor={(item) => item.id}
-              renderItem={({ item }) => (
-                <TouchableOpacity
-                  style={[
-                    styles.itemRow,
-                    currentId === item.id && styles.activeItemRow,
-                  ]}
-                  onPress={() => onSelect(item.id)}
-                  accessibilityRole="button"
-                  accessibilityState={{ selected: currentId === item.id }}
-                >
-                  <Text
+              renderItem={({ item }) => {
+                if (manage && manage.editingId === item.id) {
+                  return (
+                    <View style={styles.editForm}>
+                      <Input
+                        value={manage.editingName}
+                        onChangeText={manage.onChangeEditName}
+                        error={manage.error}
+                        autoFocus
+                      />
+                      <View style={styles.formActions}>
+                        <Button
+                          title="Cancelar"
+                          variant="outline"
+                          onPress={manage.onCancelEdit}
+                          style={styles.formBtn}
+                        />
+                        <Button
+                          title="Guardar"
+                          onPress={manage.onSubmitEdit}
+                          disabled={manage.editingName.trim() === ""}
+                          style={styles.formBtn}
+                        />
+                      </View>
+                    </View>
+                  );
+                }
+
+                return (
+                  <View
                     style={[
-                      styles.itemText,
-                      currentId === item.id && styles.activeItemText,
+                      styles.itemRow,
+                      currentId === item.id && styles.activeItemRow,
                     ]}
                   >
-                    {item.name}
-                  </Text>
-                </TouchableOpacity>
-              )}
+                    <TouchableOpacity
+                      style={styles.itemNameTap}
+                      onPress={() => onSelect(item.id)}
+                      accessibilityRole="button"
+                      accessibilityState={{ selected: currentId === item.id }}
+                    >
+                      <Text
+                        style={[
+                          styles.itemText,
+                          currentId === item.id && styles.activeItemText,
+                        ]}
+                      >
+                        {item.name}
+                      </Text>
+                    </TouchableOpacity>
+
+                    {manage && (
+                      <View style={styles.rowActions}>
+                        <TouchableOpacity
+                          style={styles.rowActionBtn}
+                          onPress={() => manage.onStartEdit(item.id, item.name)}
+                          accessibilityRole="button"
+                          accessibilityLabel={`Renombrar ${item.name}`}
+                        >
+                          <Text style={styles.rowActionText}>✎</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          style={styles.rowActionBtn}
+                          onPress={() => manage.onDelete(item.id, item.name)}
+                          accessibilityRole="button"
+                          accessibilityLabel={`Eliminar ${item.name}`}
+                        >
+                          <Text style={[styles.rowActionText, styles.deleteText]}>
+                            🗑
+                          </Text>
+                        </TouchableOpacity>
+                      </View>
+                    )}
+                  </View>
+                );
+              }}
               ListFooterComponent={
                 create ? (
                   <TouchableOpacity
@@ -159,8 +230,34 @@ const styles = StyleSheet.create({
     paddingBottom: Utility.spacing.s,
   },
   itemRow: {
+    flexDirection: "row",
+    alignItems: "center",
     paddingVertical: 14,
     paddingHorizontal: Utility.spacing.s,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: Colors.light.border,
+  },
+  itemNameTap: {
+    flex: 1,
+  },
+  rowActions: {
+    flexDirection: "row",
+    gap: Utility.spacing.s,
+  },
+  rowActionBtn: {
+    paddingHorizontal: Utility.spacing.s,
+    paddingVertical: 4,
+  },
+  rowActionText: {
+    fontSize: 18,
+    color: Colors.light.primary,
+  },
+  deleteText: {
+    color: "#d9534f",
+  },
+  editForm: {
+    gap: Utility.spacing.s,
+    paddingVertical: Utility.spacing.s,
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: Colors.light.border,
   },

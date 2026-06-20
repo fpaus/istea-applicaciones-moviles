@@ -83,4 +83,29 @@ describe("useHeaderProjectSwitcher", () => {
     expect(result.current.isCreating).toBe(false);
     expect(result.current.newProjectName).toBe("");
   });
+
+  it("closing the picker also cancels an in-progress rename", () => {
+    const { result } = renderHook(() => useHeaderProjectSwitcher());
+
+    act(() => result.current.open());
+    act(() => result.current.manage.startEdit("p1", "Trabajo"));
+    expect(result.current.manage.editingId).toBe("p1");
+
+    act(() => result.current.close());
+
+    expect(result.current.manage.editingId).toBeNull();
+  });
+
+  it("selecting a project also cancels an in-progress rename", async () => {
+    const { result } = renderHook(() => useHeaderProjectSwitcher());
+
+    act(() => result.current.open());
+    act(() => result.current.manage.startEdit("p2", "Casa"));
+
+    await act(async () => {
+      await result.current.handleSelect("p1");
+    });
+
+    expect(result.current.manage.editingId).toBeNull();
+  });
 });

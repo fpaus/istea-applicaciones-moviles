@@ -35,12 +35,45 @@ export const createProjectState =
       });
     },
 
+    renameProject: async (id, name) => {
+      const trimmed = name.trim();
+      const normalizedName = trimmed.toLowerCase();
+      const target = get().projects.find((p) => p.id === id);
+      if (!target) {
+        throw new Error("Project not found");
+      }
+      const exists = get().projects.some(
+        (p) => p.id !== id && p.name.trim().toLowerCase() === normalizedName,
+      );
+      if (exists) {
+        throw new Error("Project already exists");
+      }
+      const updated: Project = { ...target, name: trimmed };
+      set({
+        projects: get().projects.map((p) => (p.id === id ? updated : p)),
+        currentProject:
+          get().currentProject?.id === id ? updated : get().currentProject,
+      });
+    },
+
     selectProject: async (id) => {
       const match = get().projects.find((p) => p.id === id);
       if (!match) {
         throw new Error("Project not found");
       }
       set({ currentProject: match });
+    },
+
+    deleteProject: async (id) => {
+      // Task cascade (removing the project's tasks + cancelling their
+      // notifications) is orchestrated by `useProjectActions` to keep stores
+      // decoupled; here we only drop the project and clear the active session
+      // if it was the one deleted.
+      set({
+        projects: get().projects.filter((p) => p.id !== id),
+        currentProject:
+          get().currentProject?.id === id ? null : get().currentProject,
+      });
     },
 
     deselectProject: async () => {

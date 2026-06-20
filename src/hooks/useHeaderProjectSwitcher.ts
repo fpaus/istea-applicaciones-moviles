@@ -23,6 +23,7 @@ export function useHeaderProjectSwitcher() {
     startCreating,
     cancelCreating,
     handleCreate,
+    manage,
   } = useProjectSelector();
 
   // Closing the picker should also discard any half-typed new project.
@@ -47,5 +48,6 @@ export function useHeaderProjectSwitcher() {
     startCreating,
     cancelCreating,
     handleCreate,
+    manage,
   };
 }

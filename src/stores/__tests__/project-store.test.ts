@@ -55,4 +55,90 @@ describe("project store", () => {
       /project not found/i,
     );
   });
+
+  it("renameProject updates the project's name (trimmed)", async () => {
+    const store = makeStore();
+    await store.getState().createProject("Trabajo");
+    const id = store.getState().projects[0].id;
+
+    await store.getState().renameProject(id, "  Personal  ");
+
+    expect(store.getState().projects[0].name).toBe("Personal");
+  });
+
+  it("renameProject updates currentProject when the active project is renamed", async () => {
+    const store = makeStore();
+    await store.getState().createProject("Trabajo");
+    const id = store.getState().projects[0].id;
+
+    await store.getState().renameProject(id, "Personal");
+
+    expect(store.getState().currentProject?.name).toBe("Personal");
+  });
+
+  it("renameProject rejects a case-insensitive duplicate of another project", async () => {
+    const store = makeStore();
+    await store.getState().createProject("Trabajo");
+    await store.getState().createProject("Personal");
+    const trabajoId = store.getState().projects.find((p) => p.name === "Trabajo")!.id;
+
+    await expect(
+      store.getState().renameProject(trabajoId, "personal"),
+    ).rejects.toThrow(/already exists/i);
+
+    expect(store.getState().projects.map((p) => p.name).sort()).toEqual([
+      "Personal",
+      "Trabajo",
+    ]);
+  });
+
+  it("renameProject allows renaming a project to a different case of its own name", async () => {
+    const store = makeStore();
+    await store.getState().createProject("Trabajo");
+    const id = store.getState().projects[0].id;
+
+    await store.getState().renameProject(id, "TRABAJO");
+
+    expect(store.getState().projects[0].name).toBe("TRABAJO");
+  });
+
+  it("renameProject throws if the project is not found", async () => {
+    const store = makeStore();
+    await expect(
+      store.getState().renameProject("nope", "Whatever"),
+    ).rejects.toThrow(/project not found/i);
+  });
+
+  it("deleteProject removes the project from the list and leaves others intact", async () => {
+    const store = makeStore();
+    await store.getState().createProject("Trabajo");
+    await store.getState().createProject("Personal");
+    const trabajoId = store.getState().projects.find((p) => p.name === "Trabajo")!.id;
+
+    await store.getState().deleteProject(trabajoId);
+
+    expect(store.getState().projects.map((p) => p.name)).toEqual(["Personal"]);
+  });
+
+  it("deleteProject clears currentProject when the deleted project was active", async () => {
+    const store = makeStore();
+    await store.getState().createProject("Trabajo");
+    const id = store.getState().projects[0].id;
+    expect(store.getState().currentProject?.id).toBe(id);
+
+    await store.getState().deleteProject(id);
+
+    expect(store.getState().currentProject).toBeNull();
+  });
+
+  it("deleteProject keeps currentProject when a different project is deleted", async () => {
+    const store = makeStore();
+    await store.getState().createProject("Trabajo");
+    await store.getState().createProject("Personal"); // becomes active
+    const trabajoId = store.getState().projects.find((p) => p.name === "Trabajo")!.id;
+
+    await store.getState().deleteProject(trabajoId);
+
+    expect(store.getState().currentProject?.name).toBe("Personal");
+  });
 });

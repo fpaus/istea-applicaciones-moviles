@@ -127,6 +127,88 @@ describe("task store", () => {
     expect(beforeTask.notificationId).toBe("notif-A"); // original object not mutated
   });
 
+  it("removeProjectTasks cancels each task's notification and drops the project's key", async () => {
+    const notifications = makeFakeNotifications();
+    notifications.scheduleNotification
+      .mockResolvedValueOnce("notif-A")
+      .mockResolvedValueOnce("notif-B");
+    const store = makeStore(notifications);
+
+    await store.getState().addTask("project-1", "Work", { ...sampleInput, title: "A" });
+    await store.getState().addTask("project-1", "Work", { ...sampleInput, title: "B" });
+    await store.getState().addTask("project-2", "Personal", sampleInput);
+
+    await store.getState().removeProjectTasks("project-1");
+
+    expect(notifications.cancelNotification).toHaveBeenCalledWith("notif-A");
+    expect(notifications.cancelNotification).toHaveBeenCalledWith("notif-B");
+    expect(store.getState().tasks).not.toHaveProperty("project-1");
+    expect(store.getState().tasks["project-2"]).toHaveLength(1);
+  });
+
+  it("removeProjectTasks updates immutably and skips tasks without a notificationId", async () => {
+    const notifications = makeFakeNotifications();
+    notifications.scheduleNotification.mockResolvedValueOnce(null as any);
+    const store = makeStore(notifications);
+
+    await store.getState().addTask("project-1", "Work", sampleInput);
+    const before = store.getState().tasks;
+
+    await store.getState().removeProjectTasks("project-1");
+
+    expect(notifications.cancelNotification).not.toHaveBeenCalled();
+    expect(store.getState().tasks).not.toBe(before); // new reference
+    expect(store.getState().tasks).not.toHaveProperty("project-1");
+  });
+
+  it("removeProjectTasks still drops the project's tasks when cancelling a notification fails", async () => {
+    const notifications = makeFakeNotifications();
+    notifications.cancelNotification.mockRejectedValueOnce(new Error("boom"));
+    jest.spyOn(console, "error").mockImplementation(() => {});
+    const store = makeStore(notifications);
+
+    await store.getState().addTask("project-1", "Work", sampleInput);
+    await store.getState().removeProjectTasks("project-1");
+
+    expect(store.getState().tasks).not.toHaveProperty("project-1");
+  });
+
+  it("deleteTask still removes the task when cancelling its notification fails", async () => {
+    const notifications = makeFakeNotifications();
+    notifications.cancelNotification.mockRejectedValueOnce(new Error("boom"));
+    jest.spyOn(console, "error").mockImplementation(() => {});
+    const store = makeStore(notifications);
+
+    await store.getState().addTask("project-1", "Work", sampleInput);
+    const id = store.getState().tasks["project-1"][0].id;
+
+    await store.getState().deleteTask("project-1", id);
+
+    expect(store.getState().tasks["project-1"]).toHaveLength(0);
+  });
+
+  it("clearAll still empties the project when a cancellation fails", async () => {
+    const notifications = makeFakeNotifications();
+    notifications.cancelNotification.mockRejectedValueOnce(new Error("boom"));
+    jest.spyOn(console, "error").mockImplementation(() => {});
+    const store = makeStore(notifications);
+
+    await store.getState().addTask("project-1", "Work", sampleInput);
+    await store.getState().clearAll("project-1");
+
+    expect(store.getState().tasks["project-1"]).toHaveLength(0);
+  });
+
+  it("removeProjectTasks is a no-op for a project with no tasks", async () => {
+    const notifications = makeFakeNotifications();
+    const store = makeStore(notifications);
+
+    await store.getState().removeProjectTasks("ghost");
+
+    expect(notifications.cancelNotification).not.toHaveBeenCalled();
+    expect(store.getState().tasks).not.toHaveProperty("ghost");
+  });
+
   it("addTask schedules without project prefix when projectName is empty", async () => {
     const notifications = makeFakeNotifications();
     const store = makeStore(notifications);

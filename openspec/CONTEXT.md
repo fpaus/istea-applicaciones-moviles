@@ -134,7 +134,9 @@ Written by each store's `persist` middleware (JSON-serialized store state):
 ### Project Selection (local, on-device)
 - **Create Project** (`useProjectStore.createProject`): rejects duplicate project names (case-insensitive), appends to the store's `projects` list, and automatically selects it as the active `currentProject`.
 - **Select Project** (`useProjectStore.selectProject`): sets the active `currentProject` in the store.
-- **Switch Project**: The dashboard header shows the active project name; tapping it (`<HeaderProjectSwitcher>`) opens the shared `<ProjectPickerModal>` to switch the active project instantly, in place. The picker also offers a "+ Nuevo Proyecto" row to create another project without leaving the dashboard.
+- **Rename Project** (`useProjectStore.renameProject`): updates a project's name with the same trimmed, case-insensitive uniqueness as creation (excluding the project's own id); updates `currentProject` when the active project is renamed. Edited inline per row in the picker.
+- **Delete Project** (`useProjectActions.deleteProject(id, name)`): cascades — removes the project (`useProjectStore.deleteProject`) and its tasks + their notifications (`useTaskStore.removeProjectTasks`), clearing `currentProject` (back to the selector) if it was active. Gated behind a Spanish confirmation `Alert` that **names the project and its task count** ("no se puede deshacer"). The cascade is orchestrated in the hook so the stores stay decoupled.
+- **Switch Project**: The dashboard header shows the active project name; tapping it (`<HeaderProjectSwitcher>`) opens the shared `<ProjectPickerModal>` to switch the active project instantly, in place. The picker also offers a "+ Nuevo Proyecto" row to create another project, plus per-row rename/delete affordances — all without leaving the dashboard.
 - Session restored on launch by the project store's `persist` rehydration.
 
 ### Tasks
@@ -163,8 +165,11 @@ Written by each store's `persist` middleware (JSON-serialized store state):
   `notificationId` of the matching task across all projects when it fires.
 
 ### Global state (Zustand)
-- Two persisted stores: `useProjectStore` (`currentProject` + `projects` list) and
-  `useTaskStore` (`tasks` dictionary + add/delete/markCompleted/clearAll actions).
+- Two persisted stores: `useProjectStore` (`currentProject` + `projects` list;
+  create/rename/select/delete actions) and `useTaskStore` (`tasks` dictionary +
+  add/delete/markCompleted/clearAll/removeProjectTasks actions).
+- Cross-store coordination (e.g. deleting a project and cascading to its tasks)
+  lives in hooks (`useProjectActions`), never by one store importing another.
 - Each uses the `persist` middleware (AsyncStorage), syncing on every change and
   rehydrating on launch. Task actions call an **injected** `NotificationService`
   inline and write the returned `notificationId` back in the same update.
@@ -200,12 +205,12 @@ touches the affected area:
 - **Recurrence is binary.** `repeats` is a boolean meaning "daily." There is no
   weekly / custom-interval / specific-days / end-date recurrence yet.
 - **Auth is local (no backend).** There are no passwords or credentials. Projects are name-only, managed locally via on-device storage.
-- **No edit flow.** Tasks can be created, completed, or deleted — not edited.
+- **No task edit flow.** Tasks can be created, completed, or deleted — not edited. (Projects can now be renamed and deleted.)
 - **Test coverage is partial.** A Jest + React Native Testing Library harness is in
   place (`npm test`) with unit tests for the stores and hooks; screen/integration
   coverage is not built out yet.
 - **No seeded data.** The app starts empty; first use requires creating a project.
-- **No project deletion/archiving.** There is no cascade deletion or archiving of projects; created projects and their tasks persist indefinitely.
+- **No project archiving.** Projects can be renamed and deleted (delete cascades to their tasks + notifications), but there is no archiving, color/metadata, reordering, bulk delete, or undo.
 - **No task undo flow.** Once a task is completed or deleted, its scheduled OS notification is immediately canceled, and there is no "undo" recovery flow.
 
 ## 7. Planned / future features (intended direction)
@@ -226,6 +231,7 @@ The following architectural and design decisions were made during the refactorin
 - **Granular Scoped Notification Canceling**: When clearing all tasks inside a project (e.g., `clearAll`), the store loops through the active project's tasks and cancels their notifications individually by ID instead of calling a global `cancelAllNotifications()`. This protects scheduled notifications in other projects from being cleared.
 - **Cross-Project Notification Scan Bridge**: Because OS-level local notification fired events only receive a flat `notificationId` payload without metadata, the `useNotificationBridge` invokes `clearNotificationId` which scans the entire dictionary across all project IDs to locate and nullify the matching notification ID globally.
 - **Resilient Fallback on Notification Rejection**: If local notification scheduling fails or the user denies permission, the store still successfully persists the task with a `null` `notificationId`. The application handles `null` notification IDs gracefully, ensuring local task access remains unimpeded.
+- **Resilient Notification Cancellation**: Every task-store mutation that cancels a notification (`deleteTask`, `markCompleted`, `clearAll`, `removeProjectTasks`) routes through a shared `safeCancel` helper that swallows/logs cancel failures. A failing OS cancellation never aborts or partially corrupts the data mutation — the task/project state always updates (consistent with the scheduling fallback above).
 - **Case-Insensitive Project Uniqueness**: To avoid duplicate projects, project creation checks name existence using trimmed, case-insensitive logic.
 - **Seamless In-Place Project Selector**: Rather than requiring a logout step, the dashboard header exposes `<HeaderProjectSwitcher>` (the active project name as a tappable affordance), enabling instant project-switching in-place without redirecting to a splash screen or forcing screen resets. First-run selection still renders `<ProjectSelector>` inline on the dashboard when no project is active.
 - **Single Reusable Picker (`<ProjectPickerModal>`)**: The project list + inline-create modal is a single presentational component whose behavior is passed entirely via props (`onSelect`, `onClose`, optional `create` flow). Both `<ProjectSelector>` (list-only) and `<HeaderProjectSwitcher>` (list + create) render it, so the picker UI/UX has one source of truth. `useHeaderProjectSwitcher` delegates to `useProjectSelector` so the create/select logic also lives in one place.

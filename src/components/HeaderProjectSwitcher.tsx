@@ -24,6 +24,7 @@ export function HeaderProjectSwitcher() {
     startCreating,
     cancelCreating,
     handleCreate,
+    manage,
   } = useHeaderProjectSwitcher();
 
   return (
@@ -56,6 +57,16 @@ export function HeaderProjectSwitcher() {
           onStart: startCreating,
           onCancel: cancelCreating,
           onSubmit: handleCreate,
+        }}
+        manage={{
+          editingId: manage.editingId,
+          editingName: manage.editingName,
+          error: manage.error,
+          onStartEdit: manage.startEdit,
+          onChangeEditName: manage.changeEditName,
+          onCancelEdit: manage.cancelEdit,
+          onSubmitEdit: manage.submitEdit,
+          onDelete: manage.deleteProject,
         }}
       />
     </>

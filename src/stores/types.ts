@@ -31,6 +31,12 @@ export interface TaskState {
   deleteTask: (projectId: string, id: string) => Promise<void>;
   markCompleted: (projectId: string, id: string) => Promise<void>;
   clearAll: (projectId: string) => Promise<void>;
+  /**
+   * Cascade target for project deletion: cancels every task's notification and
+   * drops the project's key from the dictionary. Called by `useProjectActions`
+   * so the stores stay decoupled.
+   */
+  removeProjectTasks: (projectId: string) => Promise<void>;
   /** Event-bridge entry point: a fired notification clears its task's id. */
   clearNotificationId: (notificationId: string) => void;
   setHasHydrated: (value: boolean) => void;
@@ -44,6 +50,8 @@ export interface ProjectState {
   hasHydrated: boolean;
   selectProject: (id: string) => Promise<void>;
   createProject: (name: string) => Promise<void>;
+  renameProject: (id: string, name: string) => Promise<void>;
+  deleteProject: (id: string) => Promise<void>;
   deselectProject: () => Promise<void>;
   setHasHydrated: (value: boolean) => void;
 }

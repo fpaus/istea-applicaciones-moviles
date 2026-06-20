@@ -30,6 +30,7 @@ export function ProjectSelector({
     closeDropdown,
     handleCreate,
     handleSelect,
+    manage,
   } = useProjectSelector(onSelect);
 
   // If there are no projects, prompt creation of the first one
@@ -110,13 +111,23 @@ export function ProjectSelector({
         </View>
       )}
 
-      {/* Picker Modal Dropdown (shared, list-only) */}
+      {/* Picker Modal Dropdown (shared, with rename/delete affordances) */}
       <ProjectPickerModal
         visible={showDropdown}
         projects={projects}
         currentId={currentProject?.id}
         onSelect={handleSelect}
         onClose={closeDropdown}
+        manage={{
+          editingId: manage.editingId,
+          editingName: manage.editingName,
+          error: manage.error,
+          onStartEdit: manage.startEdit,
+          onChangeEditName: manage.changeEditName,
+          onCancelEdit: manage.cancelEdit,
+          onSubmitEdit: manage.submitEdit,
+          onDelete: manage.deleteProject,
+        }}
       />
     </View>
   );

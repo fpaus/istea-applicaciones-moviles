@@ -1,6 +1,7 @@
 import { useCallback, useState } from "react";
 import { Alert } from "react-native";
 import { useProject } from "./useProject";
+import { useProjectManager } from "./useProjectManager";
 
 /**
  * Encapsulates all state and handlers for the project selector UI (create /
@@ -8,6 +9,9 @@ import { useProject } from "./useProject";
  */
 export function useProjectSelector(onSelect?: (id: string) => void) {
   const { currentProject, projects, selectProject, createProject } = useProject();
+  // Owns the per-row rename/delete flow so that the picker has a single source
+  // of interaction state — closing/selecting resets any in-progress rename.
+  const manage = useProjectManager();
 
   const [isCreating, setIsCreating] = useState(false);
   const [newProjectName, setNewProjectName] = useState("");
@@ -27,8 +31,12 @@ export function useProjectSelector(onSelect?: (id: string) => void) {
     setError("");
   }, []);
 
+  const { cancelEdit } = manage;
   const openDropdown = useCallback(() => setShowDropdown(true), []);
-  const closeDropdown = useCallback(() => setShowDropdown(false), []);
+  const closeDropdown = useCallback(() => {
+    setShowDropdown(false);
+    cancelEdit();
+  }, [cancelEdit]);
 
   const handleCreate = useCallback(async () => {
     if (newProjectName.trim() === "") {
@@ -50,12 +58,13 @@ export function useProjectSelector(onSelect?: (id: string) => void) {
       try {
         await selectProject(id);
         setShowDropdown(false);
+        cancelEdit();
         onSelect?.(id);
       } catch (e: any) {
         Alert.alert("Error", e.message);
       }
     },
-    [selectProject, onSelect],
+    [selectProject, onSelect, cancelEdit],
   );
 
   return {
@@ -73,5 +82,6 @@ export function useProjectSelector(onSelect?: (id: string) => void) {
     closeDropdown,
     handleCreate,
     handleSelect,
+    manage,
   };
 }

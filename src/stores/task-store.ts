@@ -40,7 +40,20 @@ export function selectCompleted(tasks: Task[]): Task[] {
  */
 export const createTaskState =
   (deps: TaskDeps): StateCreator<TaskState> =>
-  (set, get) => ({
+  (set, get) => {
+    // Resilience: cancelling an OS notification must never abort or partially
+    // corrupt the data mutation that triggered it (mirrors `addTask`, which
+    // swallows scheduling errors). A failed cancel is logged, not thrown.
+    const safeCancel = async (id: string | null) => {
+      if (!id) return;
+      try {
+        await deps.notifications.cancelNotification(id);
+      } catch (error) {
+        console.error("[task-store] Failed to cancel notification:", error);
+      }
+    };
+
+    return {
     tasks: {},
     hasHydrated: false,
 
@@ -90,9 +103,7 @@ export const createTaskState =
     deleteTask: async (projectId, id) => {
       const projectTasks = get().tasks[projectId] || [];
       const item = projectTasks.find((t) => t.id === id);
-      if (item?.notificationId) {
-        await deps.notifications.cancelNotification(item.notificationId);
-      }
+      await safeCancel(item?.notificationId ?? null);
       set({
         tasks: {
           ...get().tasks,
@@ -104,9 +115,7 @@ export const createTaskState =
     markCompleted: async (projectId, id) => {
       const projectTasks = get().tasks[projectId] || [];
       const item = projectTasks.find((t) => t.id === id);
-      if (item?.notificationId) {
-        await deps.notifications.cancelNotification(item.notificationId);
-      }
+      await safeCancel(item?.notificationId ?? null);
       set({
         tasks: {
           ...get().tasks,
@@ -120,9 +129,7 @@ export const createTaskState =
     clearAll: async (projectId) => {
       const projectTasks = get().tasks[projectId] || [];
       for (const t of projectTasks) {
-        if (t.notificationId) {
-          await deps.notifications.cancelNotification(t.notificationId);
-        }
+        await safeCancel(t.notificationId);
       }
       set({
         tasks: {
@@ -130,6 +137,17 @@ export const createTaskState =
           [projectId]: [],
         },
       });
+    },
+
+    removeProjectTasks: async (projectId) => {
+      const projectTasks = get().tasks[projectId];
+      if (!projectTasks) return;
+      for (const t of projectTasks) {
+        await safeCancel(t.notificationId);
+      }
+      // Immutably drop the project's key so subscribers re-render.
+      const { [projectId]: _removed, ...rest } = get().tasks;
+      set({ tasks: rest });
     },
 
     clearNotificationId: (notificationId) => {
@@ -154,7 +172,8 @@ export const createTaskState =
     },
 
     setHasHydrated: (value) => set({ hasHydrated: value }),
-  });
+    };
+  };
 
 export const createTaskStore = (
   deps: TaskDeps = { notifications: notificationService },
