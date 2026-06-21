@@ -8,13 +8,14 @@
 
 ## 1. What the app is
 
-**Recurring Reminders** is a React Native + Expo (TypeScript) mobile app for
+**Recurring Reminders** is a React Native + Expo (TypeScript) mobile and web app for
 creating tasks that fire **local device notifications** at a chosen
 time of day. A task can optionally **repeat daily**. The app ships with a
 local (on-device) project selection flow so it is usable immediately without a backend or remote servers.
+The web app runs in Single Page Application (SPA) mode.
 
 There is **no remote server or API**. All state lives on the device via
-`AsyncStorage`.
+`AsyncStorage` (falling back to browser `localStorage` on web).
 
 ## 2. Tech stack
 
@@ -155,14 +156,15 @@ Written by each store's `persist` middleware (JSON-serialized store state):
 ### Notifications (local)
 - Permission requested on demand; Android uses a `"tasks"` channel
   (HIGH importance, vibration, sound).
+- **Native-Only with Web Graceful Degradation**: Notifications are supported only on native platforms (Android). On web, notifications are disabled and the app gracefully degrades, displaying a warning banner that notifications are disabled.
 - **Scheduling** (`NotificationService.scheduleNotification`):
-  - `repeats === true` → `DAILY` trigger at `time.hour:time.minute`.
+  - `repeats === true` → `DAILY` trigger at `time.hour:time.minute` (native only).
   - `repeats === false` → one-shot `DATE` trigger at the next occurrence of
-    that time (today if still in the future, else tomorrow).
+    that time (today if still in the future, else tomorrow; native only).
   - Title is prefixed with active project name: `[Project Name] Task Title`.
 - A received-notification listener (`useNotificationBridge`, subscribed via
   `NotificationService.addNotificationReceivedListener`) clears the
-  `notificationId` of the matching task across all projects when it fires.
+  `notificationId` of the matching task across all projects when it fires (native only).
 
 ### Global state (Zustand)
 - Two persisted stores: `useProjectStore` (`currentProject` + `projects` list;
@@ -181,6 +183,11 @@ Written by each store's `persist` middleware (JSON-serialized store state):
 - The app starts empty; first use requires **creating a project**.
 - `app/_layout.tsx` mounts `useNotificationBridge` and renders nothing until
   `useHydrated()` reports both stores have rehydrated (the hydration gate).
+
+### Web Compatibility (SPA)
+- **Single Page Application (SPA) Mode**: Configured via `app.json` (`web.output: "single"`) to execute entirely in the browser, avoiding node-based server-side rendering (SSR) environments that lack `window`/`localStorage` APIs.
+- **Zustand CommonJS Resolution**: Metro is configured (`metro.config.js`) to resolve Zustand and its subpaths (like `zustand/middleware`) using their CommonJS builds, avoiding the use of modern ESM `import.meta.env` syntax which is unsupported by browser scripts.
+- **Graceful Notifications Bypass**: The notifications module uses a `Platform.OS !== "web"` platform guard at the import boundary to completely bypass loading `expo-notifications` on web, avoiding localStorage-related crash side effects. All notification APIs resolve to no-ops or default statuses.
 
 ### Routing structure
 ```

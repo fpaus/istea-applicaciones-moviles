@@ -234,5 +234,39 @@ describe("NotificationService when expo-notifications fails to load", () => {
   });
 });
 
+describe("NotificationService on web platform", () => {
+  it("does not load expo-notifications and returns no-op fallbacks", async () => {
+    const originalOS = Platform.OS;
+    Object.defineProperty(Platform, "OS", { get: () => "web", configurable: true });
+
+    let IsolatedService: typeof NotificationService | undefined;
+
+    jest.isolateModules(() => {
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const mod = require("../notifications");
+      IsolatedService = mod.NotificationService;
+    });
+
+    Object.defineProperty(Platform, "OS", { get: () => originalOS, configurable: true });
+
+    if (!IsolatedService) {
+      throw new Error("IsolatedService is undefined");
+    }
+
+    const service = new IsolatedService();
+
+    expect(await service.requestPermission()).toBe(false);
+    expect(await service.checkPermission()).toBe(false);
+    expect(await service.scheduleNotification("t", "b", { hour: 9, minute: 0 }, true)).toBeNull();
+    await expect(service.cancelNotification("123")).resolves.toBeUndefined();
+    await expect(service.cancelAllNotifications()).resolves.toBeUndefined();
+
+    const sub = service.addNotificationReceivedListener(() => {});
+    expect(typeof sub.remove).toBe("function");
+
+    const subResp = service.addNotificationResponseReceivedListener(() => {});
+    expect(typeof subResp.remove).toBe("function");
+  });
+});
 
 

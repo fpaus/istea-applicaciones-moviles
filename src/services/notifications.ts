@@ -4,14 +4,16 @@ import { Platform } from "react-native";
 import { Time } from "../types";
 
 let Notifications: typeof NotificationsType | null = null;
-try {
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  Notifications = require("expo-notifications") as typeof NotificationsType;
-} catch (error) {
-  console.warn(
-    "[NotificationService] Failed to load expo-notifications module. Notification features will be disabled.",
-    error,
-  );
+if (Platform.OS !== "web") {
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    Notifications = require("expo-notifications") as typeof NotificationsType;
+  } catch (error) {
+    console.warn(
+      "[NotificationService] Failed to load expo-notifications module. Notification features will be disabled.",
+      error,
+    );
+  }
 }
 
 if (Notifications) {
