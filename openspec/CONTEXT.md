@@ -27,6 +27,7 @@ There is **no remote server or API**. All state lives on the device via
 | Navigation UI | `expo-router` native stack with a custom header |
 | Notifications | `expo-notifications` (local scheduling + permissions) |
 | Images | `expo-image-picker` (gallery selection) + `expo-image` (display) |
+| Contacts | `expo-contacts` (native device contact picker) |
 | Persistence | `@react-native-async-storage/async-storage` |
 | Tooling | ESLint (`eslint-config-expo`), Prettier |
 
@@ -50,8 +51,9 @@ stores  (Zustand: useProjectStore, useTaskStore)
   │   persist middleware ─► AsyncStorage         (state + persistence)
   │   task actions ─► NotificationService (injected dependency)
   │
-services  (NotificationService — OS side-effects only) ─► expo-notifications
+services | (NotificationService — OS side-effects only) ─► expo-notifications
           (ImagePickerService — gallery selection + permission) ─► expo-image-picker
+          (ContactsService — contact selection + permission) ─► expo-contacts
   │
 utils  (src/utils/uuid.ts, src/utils/tasks-cascade.ts — generateUUID, cascade helpers)
   │
@@ -126,10 +128,16 @@ interface Task {
     longitude: number;
     label?: string;
   } | null;
+  responsible?: {             // snapshot of a selected contact (null/absent = none)
+    name: string;
+    contactId?: string;
+    phone?: string;
+    email?: string;
+  } | null;
 }
 ```
 
-`NewTask` (input to create) = `{ title, description, notification?, parentId?, imageUri?, location? }`.
+`NewTask` (input to create) = `{ title, description, notification?, parentId?, imageUri?, location?, responsible? }`.
 
 ### AsyncStorage keys
 
@@ -174,6 +182,14 @@ Written by each store's `persist` middleware (JSON-serialized store state):
 - **Optional label**: best-effort reverse-geocoding label is generated if available; a failure/timeout fallback to raw coordinates does not block location capture.
 - **Form capture**: `useAddTaskForm` and `useEditTaskForm` hooks capture device location or allow manual coordinates entry (with optional label) via `LocationSelectionModal`, presenting coordinates and label readout to the user, allowing updating or removing it entirely.
 - **Display**: read-only location display on the detail view (`detail.tsx`) and as a small indicator (📍 pin + label or coordinates) on the dashboard `CardItem`.
+
+### Task Responsible / Assignee (local, native-only)
+- **Device Contacts** (`ContactsService`): `requestPermission()` and `pickResponsible()` wrap `expo-contacts`.
+- **Resilient**: wrapped in try/catch and returns `null` on permission denial, cancel, or failure so it never blocks task creation or editing.
+- **Picker Fallback**: uses the native system contact picker where supported (`presentContactPickerAsync`); falls back to an in-app permissioned list query (`getContactsAsync`) if the native presenter throws or is unsupported.
+- **Snapshot Storage**: stores a flat copy (name, optional contact ID, optional phone number, and optional email) on the task instead of a live reference. This makes the task resilient if the underlying contact is modified or deleted in the system address book.
+- **Form Integration**: `useAddTaskForm` and `useEditTaskForm` hooks hold the responsible state, allowing picking, displaying, and clearing the responsible contact in both screens.
+- **Display**: read-only contact name, phone, and email details displayed on the detail view (`detail.tsx`) if present, and a simple indicator (👤 + name) on the dashboard `CardItem`.
 
 ### Notifications (local)
 - Permission requested on demand; Android uses a `"tasks"` channel
@@ -270,4 +286,6 @@ The following architectural and design decisions were made during the refactorin
 - **Destructive Confirmation Interceptors**: Destructive hook actions (like `clearAll`) are intercepted by native confirmation alerts before executing store mutations to prevent accidental data loss.
 - **Hierarchical Tasks via Flat Array**: Decouples the hierarchical UI structure from the storage format by keeping all tasks in a flat list per project and deriving parent-child connections in-memory using pure traversal helpers (`descendants`, `ancestors`, `childrenOf`).
 - **Resilient Multi-Task Cascades**: Invariants of completion and deletion are calculated cleanly in pure transforms, and their associated OS notifications are reconciled in bulk inline with robust failure containment (failures in scheduling/cancelling one task do not abort the overall mutation or corrupt state).
+- **Resilient Contacts Snapshot Pattern**: The `responsible` task property stores a copy of the selected contact's fields (`name`, `contactId`, `phone`, `email`) rather than querying the device's address book live. This guarantees task display resilience even if the underlying device contact is later altered or deleted.
+- **Graceful Fallbacks for Contact Picker**: If `Contacts.presentContactPickerAsync()` throws due to specific SDK limitations, `ContactsService` falls back to querying the contact list directly via `Contacts.getContactsAsync()`, maintaining picking capability on all devices.
 

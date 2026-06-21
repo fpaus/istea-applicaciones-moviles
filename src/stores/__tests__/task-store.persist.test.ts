@@ -127,4 +127,29 @@ describe("task store — persistence", () => {
     await rehydrated.persist.rehydrate();
     expect(rehydrated.getState().tasks["project-1"][0].location).toEqual(sampleLocation);
   });
+
+  it("preserves a task's responsible across the persist/merge round-trip", async () => {
+    const store = createTaskStore({ notifications: fakeNotifications() });
+    // Let initial (empty) rehydration settle so it doesn't clobber the add below.
+    await store.persist.rehydrate();
+    const sampleResponsible = {
+      name: "Juan Perez",
+      contactId: "c-1",
+      phone: "12345678",
+    };
+    await store.getState().addTask("project-1", "Work", {
+      ...input,
+      responsible: sampleResponsible,
+    });
+    await flush();
+
+    const raw = await AsyncStorage.getItem("task-store");
+    const parsed = JSON.parse(raw as string);
+    expect(parsed.state.tasks["project-1"][0].responsible).toEqual(sampleResponsible);
+
+    // Rehydrate into a fresh store and confirm the value survives the merge.
+    const rehydrated = createTaskStore({ notifications: fakeNotifications() });
+    await rehydrated.persist.rehydrate();
+    expect(rehydrated.getState().tasks["project-1"][0].responsible).toEqual(sampleResponsible);
+  });
 });

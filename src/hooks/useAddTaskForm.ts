@@ -2,7 +2,9 @@ import { useRouter } from "expo-router";
 import { useCallback, useState } from "react";
 import { imagePickerService } from "../services/image-picker";
 import { locationService } from "../services/location";
+import { contactsService } from "../services/contacts";
 import { useTaskActions } from "./useTaskActions";
+import { Task } from "../types";
 
 export interface UseAddTaskFormResult {
   title: string;
@@ -25,6 +27,9 @@ export interface UseAddTaskFormResult {
   isLocating: boolean;
   captureLocation: () => Promise<void>;
   clearLocation: () => void;
+  responsible: NonNullable<Task["responsible"]> | null;
+  pickResponsible: () => Promise<void>;
+  clearResponsible: () => void;
   isFormValid: boolean;
   handleSave: () => Promise<void>;
 }
@@ -46,6 +51,7 @@ export function useAddTaskForm(): UseAddTaskFormResult {
   const [imageUri, setImageUri] = useState<string | null>(null);
   const [location, setLocation] = useState<{ latitude: number; longitude: number; label?: string } | null>(null);
   const [isLocating, setIsLocating] = useState(false);
+  const [responsible, setResponsible] = useState<NonNullable<Task["responsible"]> | null>(null);
 
   const isFormValid =
     title.trim() !== "" &&
@@ -72,6 +78,17 @@ export function useAddTaskForm(): UseAddTaskFormResult {
 
   const clearLocation = useCallback(() => setLocation(null), []);
 
+  const pickResponsible = useCallback(async () => {
+    const resp = await contactsService.pickResponsible();
+    if (resp) {
+      setResponsible(resp);
+    }
+  }, []);
+
+  const clearResponsible = useCallback(() => {
+    setResponsible(null);
+  }, []);
+
   const handleSave = useCallback(async () => {
     if (title.trim() === "") return;
     if (hasReminder && (hour === null || minute === null)) return;
@@ -89,6 +106,7 @@ export function useAddTaskForm(): UseAddTaskFormResult {
           : null,
       imageUri,
       location,
+      responsible,
     });
 
     setTitle("");
@@ -99,9 +117,10 @@ export function useAddTaskForm(): UseAddTaskFormResult {
     setRepeats(false);
     setImageUri(null);
     setLocation(null);
+    setResponsible(null);
 
     router.back();
-  }, [addTask, router, title, description, hasReminder, hour, minute, repeats, imageUri, location]);
+  }, [addTask, router, title, description, hasReminder, hour, minute, repeats, imageUri, location, responsible]);
 
   return {
     title,
@@ -124,6 +143,9 @@ export function useAddTaskForm(): UseAddTaskFormResult {
     isLocating,
     captureLocation,
     clearLocation,
+    responsible,
+    pickResponsible,
+    clearResponsible,
     isFormValid,
     handleSave,
   };

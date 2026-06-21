@@ -4,6 +4,7 @@ import { useTaskStore } from "../stores/task-store";
 import { useProjectStore } from "../stores/project-store";
 import { imagePickerService } from "../services/image-picker";
 import { locationService } from "../services/location";
+import { contactsService } from "../services/contacts";
 import { Task } from "../types";
 
 const EMPTY_ARRAY: Task[] = [];
@@ -29,6 +30,9 @@ export interface UseEditTaskFormResult {
   isLocating: boolean;
   captureLocation: () => Promise<void>;
   clearLocation: () => void;
+  responsible: NonNullable<Task["responsible"]> | null;
+  pickResponsible: () => Promise<void>;
+  clearResponsible: () => void;
   isFormValid: boolean;
   handleSave: () => Promise<void>;
 }
@@ -66,6 +70,9 @@ export function useEditTaskForm(
     oldTask?.location ?? null,
   );
   const [isLocating, setIsLocating] = useState(false);
+  const [responsible, setResponsible] = useState<NonNullable<Task["responsible"]> | null>(
+    oldTask?.responsible ?? null,
+  );
 
   const isFormValid =
     title.trim() !== "" &&
@@ -91,6 +98,17 @@ export function useEditTaskForm(
   }, []);
 
   const clearLocation = useCallback(() => setLocation(null), []);
+
+  const pickResponsible = useCallback(async () => {
+    const resp = await contactsService.pickResponsible();
+    if (resp) {
+      setResponsible(resp);
+    }
+  }, []);
+
+  const clearResponsible = useCallback(() => {
+    setResponsible(null);
+  }, []);
 
   const handleSave = useCallback(async () => {
     if (!oldTask) return;
@@ -119,6 +137,22 @@ export function useEditTaskForm(
 
     if (locationChanged) {
       patch.location = location;
+    }
+
+    const oldResp = oldTask.responsible ?? null;
+    const newResp = responsible ?? null;
+    const responsibleChanged =
+      (!oldResp && newResp) ||
+      (oldResp && !newResp) ||
+      (oldResp && newResp && (
+        oldResp.name !== newResp.name ||
+        oldResp.contactId !== newResp.contactId ||
+        oldResp.phone !== newResp.phone ||
+        oldResp.email !== newResp.email
+      ));
+
+    if (responsibleChanged) {
+      patch.responsible = responsible;
     }
 
     if (!hasReminder) {
@@ -168,6 +202,7 @@ export function useEditTaskForm(
     repeats,
     imageUri,
     location,
+    responsible,
     oldTask,
     projectName,
   ]);
@@ -193,6 +228,9 @@ export function useEditTaskForm(
     isLocating,
     captureLocation,
     clearLocation,
+    responsible,
+    pickResponsible,
+    clearResponsible,
     isFormValid,
     handleSave,
   };

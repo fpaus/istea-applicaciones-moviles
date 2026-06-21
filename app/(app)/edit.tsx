@@ -111,6 +111,9 @@ export default function EditScreen(): React.JSX.Element {
     isLocating,
     captureLocation,
     clearLocation,
+    responsible,
+    pickResponsible,
+    clearResponsible,
     isFormValid,
     handleSave,
   } = useEditTaskForm(projectId, taskId);
@@ -301,6 +304,37 @@ export default function EditScreen(): React.JSX.Element {
         onClose={() => setModalVisible(false)}
         onSelect={(lat, lon, label) => setLocation({ latitude: lat, longitude: lon, label })}
       />
+
+      <View style={styles.responsibleSection}>
+        <Button
+          title={responsible ? "Cambiar responsable" : "Asignar responsable"}
+          variant="outline"
+          onPress={pickResponsible}
+        />
+        {responsible && (
+          <View style={styles.responsiblePreview}>
+            <Typography variant="body" style={styles.responsibleName}>
+              👤 {responsible.name}
+            </Typography>
+            {responsible.phone && (
+              <Typography variant="caption" style={styles.responsiblePhone}>
+                📞 {responsible.phone}
+              </Typography>
+            )}
+            {responsible.email && (
+              <Typography variant="caption" style={styles.responsibleEmail}>
+                ✉️ {responsible.email}
+              </Typography>
+            )}
+            <Button
+              title="Quitar responsable"
+              variant="outline"
+              onPress={clearResponsible}
+              style={styles.removeResponsibleBtn}
+            />
+          </View>
+        )}
+      </View>
 
       <Button
         title="Guardar Cambios"
@@ -512,5 +546,31 @@ const styles = StyleSheet.create({
   },
   locationBtn: {
     flex: 1,
+  },
+  responsibleSection: {
+    marginTop: Utility.spacing.l,
+  },
+  responsiblePreview: {
+    marginTop: Utility.spacing.m,
+    padding: Utility.spacing.m,
+    borderRadius: 8,
+    backgroundColor: "#F1F5F9",
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+  },
+  responsibleName: {
+    fontWeight: "600",
+    color: "#1E293B",
+  },
+  responsiblePhone: {
+    color: "#64748B",
+    marginTop: Utility.spacing.xs,
+  },
+  responsibleEmail: {
+    color: "#64748B",
+    marginTop: Utility.spacing.xs,
+  },
+  removeResponsibleBtn: {
+    marginTop: Utility.spacing.m,
   },
 });

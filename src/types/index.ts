@@ -16,6 +16,7 @@ export interface NewTask {
   /** Local device URI for a single attached image. Null/absent means no image. */
   imageUri?: string | null;
   location?: { latitude: number; longitude: number; label?: string } | null;
+  responsible?: { name: string; contactId?: string; phone?: string; email?: string } | null;
 }
 
 export interface Task {
@@ -29,4 +30,5 @@ export interface Task {
   /** Local device URI for a single attached image. Null/absent means no image. */
   imageUri?: string | null;
   location?: { latitude: number; longitude: number; label?: string } | null;
+  responsible?: { name: string; contactId?: string; phone?: string; email?: string } | null;
 }

@@ -931,4 +931,102 @@ describe("task store", () => {
       expect(task.location).toEqual(sampleLocation);
     });
   });
+
+  describe("responsible person attachment (responsible)", () => {
+    const sampleResponsible = {
+      name: "Juan Perez",
+      contactId: "c-1",
+      phone: "12345678",
+    };
+
+    it("addTask persists the responsible from the input", async () => {
+      const notifications = makeFakeNotifications();
+      const store = makeStore(notifications);
+
+      await store.getState().addTask("project-1", "Work", {
+        title: "With responsible",
+        description: "",
+        notification: null,
+        responsible: sampleResponsible,
+      });
+
+      expect(store.getState().tasks["project-1"][0].responsible).toEqual(sampleResponsible);
+    });
+
+    it("addTask defaults responsible to null when absent", async () => {
+      const notifications = makeFakeNotifications();
+      const store = makeStore(notifications);
+
+      await store.getState().addTask("project-1", "Work", {
+        title: "No responsible",
+        description: "",
+        notification: null,
+      });
+
+      expect(store.getState().tasks["project-1"][0].responsible).toBeNull();
+    });
+
+    it("updateTask replaces the responsible with a new value", async () => {
+      const notifications = makeFakeNotifications();
+      const store = makeStore(notifications);
+
+      await store.getState().addTask("project-1", "Work", {
+        title: "Task responsible",
+        description: "",
+        notification: null,
+        responsible: sampleResponsible,
+      });
+      const id = store.getState().tasks["project-1"][0].id;
+
+      const newResponsible = {
+        name: "Maria Lopez",
+        contactId: "c-2",
+        phone: "87654321",
+      };
+
+      await store.getState().updateTask("project-1", id, {
+        responsible: newResponsible,
+      });
+
+      expect(store.getState().tasks["project-1"][0].responsible).toEqual(newResponsible);
+    });
+
+    it("updateTask can clear the responsible to null", async () => {
+      const notifications = makeFakeNotifications();
+      const store = makeStore(notifications);
+
+      await store.getState().addTask("project-1", "Work", {
+        title: "Task responsible",
+        description: "",
+        notification: null,
+        responsible: sampleResponsible,
+      });
+      const id = store.getState().tasks["project-1"][0].id;
+
+      await store.getState().updateTask("project-1", id, {
+        responsible: null,
+      });
+
+      expect(store.getState().tasks["project-1"][0].responsible).toBeNull();
+    });
+
+    it("updateTask leaves responsible unchanged when the patch omits it", async () => {
+      const notifications = makeFakeNotifications();
+      const store = makeStore(notifications);
+
+      await store.getState().addTask("project-1", "Work", {
+        title: "Task responsible",
+        description: "",
+        notification: null,
+        responsible: sampleResponsible,
+      });
+      const id = store.getState().tasks["project-1"][0].id;
+
+      await store.getState().updateTask("project-1", id, { title: "Renamed" });
+
+      const task = store.getState().tasks["project-1"][0];
+      expect(task.title).toBe("Renamed");
+      expect(task.responsible).toEqual(sampleResponsible);
+    });
+  });
 });

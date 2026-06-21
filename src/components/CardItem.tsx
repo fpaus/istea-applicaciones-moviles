@@ -57,6 +57,13 @@ export function CardItem({
           </Typography>
         </View>
       )}
+      {item.responsible && (
+        <View style={styles.responsibleIndicator}>
+          <Typography variant="caption" style={styles.responsibleText}>
+            👤 {item.responsible.name}
+          </Typography>
+        </View>
+      )}
       {childrenCount !== undefined && childrenCount > 0 && (
         <View style={styles.progressContainer}>
           <Typography variant="caption" style={styles.progressText}>
@@ -185,6 +192,15 @@ const styles = StyleSheet.create({
     marginBottom: Utility.spacing.m,
   },
   locationText: {
+    color: "#64748B",
+    fontSize: 12,
+  },
+  responsibleIndicator: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: Utility.spacing.m,
+  },
+  responsibleText: {
     color: "#64748B",
     fontSize: 12,
   },

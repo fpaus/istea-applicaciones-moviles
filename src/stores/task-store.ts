@@ -1,6 +1,6 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { StateCreator, create } from "zustand";
-import { createJSONStorage, devtools, persist } from "zustand/middleware";
+import { StateCreator, StoreApi, UseBoundStore, create } from "zustand";
+import { createJSONStorage, devtools, persist, PersistOptions } from "zustand/middleware";
 import { notificationService } from "../services/notifications";
 import { Task } from "../types";
 import { TaskDeps, TaskState } from "./types";
@@ -177,6 +177,7 @@ export const createTaskState =
         parentId: data.parentId ?? null,
         imageUri: data.imageUri ?? null,
         location: data.location ?? null,
+        responsible: data.responsible ?? null,
       };
 
       const projectTasks = get().tasks[projectId] || [];
@@ -341,6 +342,11 @@ export const createTaskState =
       const nextLocation =
         patch.location !== undefined ? patch.location : oldTask.location;
 
+      // `responsible` is also an explicit clear vs. unchanged distinction: `undefined`
+      // means "leave as-is", `null` means "remove the responsible".
+      const nextResponsible =
+        patch.responsible !== undefined ? patch.responsible : oldTask.responsible;
+
       const updatedTask: Task = {
         ...oldTask,
         title: nextTitle,
@@ -348,6 +354,7 @@ export const createTaskState =
         notification: nextNotification,
         imageUri: nextImageUri,
         location: nextLocation,
+        responsible: nextResponsible,
       };
 
       const nextTasks = [...projectTasks];
@@ -451,7 +458,19 @@ export const createTaskState =
 
 export const createTaskStore = (
   deps: TaskDeps = { notifications: notificationService },
-) =>
+): UseBoundStore<
+  StoreApi<TaskState> & {
+    persist: {
+      rehydrate: () => Promise<void> | void;
+      hasHydrated: () => boolean;
+      onHydrate: (fn: (state: TaskState) => void) => () => void;
+      onFinishHydration: (fn: (state: TaskState) => void) => () => void;
+      clearStorage: () => void;
+      getOptions: () => Partial<PersistOptions<TaskState, unknown>>;
+      setOptions: (options: Partial<PersistOptions<TaskState, unknown>>) => void;
+    };
+  }
+> =>
   create<TaskState>()(
     devtools(
       persist(createTaskState(deps), {
@@ -468,4 +487,16 @@ export const createTaskStore = (
     ),
   );
 
-export const useTaskStore = createTaskStore();
+export const useTaskStore: UseBoundStore<
+  StoreApi<TaskState> & {
+    persist: {
+      rehydrate: () => Promise<void> | void;
+      hasHydrated: () => boolean;
+      onHydrate: (fn: (state: TaskState) => void) => () => void;
+      onFinishHydration: (fn: (state: TaskState) => void) => () => void;
+      clearStorage: () => void;
+      getOptions: () => Partial<PersistOptions<TaskState, unknown>>;
+      setOptions: (options: Partial<PersistOptions<TaskState, unknown>>) => void;
+    };
+  }
+> = createTaskStore();

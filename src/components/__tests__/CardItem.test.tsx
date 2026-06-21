@@ -128,3 +128,29 @@ describe("CardItem location indicator", () => {
     expect(queryByText(/📍/)).toBeNull();
   });
 });
+
+describe("CardItem responsible indicator", () => {
+  it("renders a responsible indicator when the task has a responsible", () => {
+    const withResponsible: Task = {
+      ...task,
+      responsible: {
+        name: "Carlos Gomez",
+        contactId: "c3",
+        phone: "555-222",
+      },
+    };
+    const { getByText } = render(
+      <CardItem item={withResponsible} onMarkCompleted={noop} onDelete={noop} />,
+    );
+
+    expect(getByText("👤 Carlos Gomez")).toBeTruthy();
+  });
+
+  it("renders no responsible indicator when the task has no responsible", () => {
+    const { queryByText } = render(
+      <CardItem item={task} onMarkCompleted={noop} onDelete={noop} />,
+    );
+
+    expect(queryByText(/👤/)).toBeNull();
+  });
+});

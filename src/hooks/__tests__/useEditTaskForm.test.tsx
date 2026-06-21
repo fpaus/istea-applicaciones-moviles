@@ -4,6 +4,7 @@ import { useTaskStore } from "../../stores/task-store";
 import { useEditTaskForm } from "../useEditTaskForm";
 import { imagePickerService } from "../../services/image-picker";
 import { locationService } from "../../services/location";
+import { contactsService } from "../../services/contacts";
 
 const mockBack = jest.fn();
 jest.mock("expo-router", () => ({ useRouter: () => ({ back: mockBack }) }));
@@ -13,15 +14,20 @@ jest.mock("../../services/image-picker", () => ({
 jest.mock("../../services/location", () => ({
   locationService: { getCurrentLocation: jest.fn() },
 }));
+jest.mock("../../services/contacts", () => ({
+  contactsService: { pickResponsible: jest.fn() },
+}));
 
 const mockPick = imagePickerService.pickFromLibrary as jest.Mock;
 const mockGetCurrentLocation = locationService.getCurrentLocation as jest.Mock;
+const mockPickResponsible = contactsService.pickResponsible as jest.Mock;
 
 describe("useEditTaskForm", () => {
   beforeEach(() => {
     mockBack.mockClear();
     mockPick.mockReset();
     mockGetCurrentLocation.mockReset();
+    mockPickResponsible.mockReset();
     useProjectStore.setState({
       currentProject: { id: "p1", name: "Work" },
       projects: [{ id: "p1", name: "Work" }],
@@ -461,6 +467,110 @@ describe("useEditTaskForm", () => {
         await result.current.captureLocation();
       });
       expect(result.current.location).toEqual(sampleLocation);
+
+      await act(async () => {
+        await result.current.handleSave();
+      });
+
+      // Nothing changed at all → updateTask not called.
+      expect(updateTaskSpy).not.toHaveBeenCalled();
+      expect(mockBack).toHaveBeenCalledTimes(1);
+      updateTaskSpy.mockRestore();
+    });
+  });
+
+  describe("responsible person", () => {
+    const sampleResponsible = {
+      name: "Juan Perez",
+      contactId: "c-1",
+      phone: "12345678",
+      email: "juan@example.com",
+    };
+
+    beforeEach(() => {
+      useTaskStore.setState({
+        tasks: {
+          p1: [
+            {
+              id: "t1",
+              title: "Task 1",
+              description: "Old description",
+              notification: null,
+              completed: false,
+              createdAt: 100,
+              responsible: sampleResponsible,
+            },
+          ],
+        },
+        hasHydrated: true,
+      });
+    });
+
+    it("pre-fills responsible from the existing task", () => {
+      const { result } = renderHook(() => useEditTaskForm("p1", "t1"));
+      expect(result.current.responsible).toEqual(sampleResponsible);
+    });
+
+    it("pickResponsible replaces the responsible and save patches the new responsible", async () => {
+      const newResp = {
+        name: "Maria Lopez",
+        contactId: "c-2",
+        phone: "87654321",
+        email: "maria@example.com",
+      };
+      mockPickResponsible.mockResolvedValue(newResp);
+      const updateTaskSpy = jest.spyOn(useTaskStore.getState(), "updateTask");
+      const { result } = renderHook(() => useEditTaskForm("p1", "t1"));
+
+      await act(async () => {
+        await result.current.pickResponsible();
+      });
+      expect(result.current.responsible).toEqual(newResp);
+
+      await act(async () => {
+        await result.current.handleSave();
+      });
+
+      expect(updateTaskSpy).toHaveBeenCalledWith(
+        "p1",
+        "t1",
+        { responsible: newResp },
+        "Work",
+      );
+      updateTaskSpy.mockRestore();
+    });
+
+    it("clearResponsible clears the responsible and save patches responsible: null", async () => {
+      const updateTaskSpy = jest.spyOn(useTaskStore.getState(), "updateTask");
+      const { result } = renderHook(() => useEditTaskForm("p1", "t1"));
+
+      act(() => {
+        result.current.clearResponsible();
+      });
+      expect(result.current.responsible).toBeNull();
+
+      await act(async () => {
+        await result.current.handleSave();
+      });
+
+      expect(updateTaskSpy).toHaveBeenCalledWith(
+        "p1",
+        "t1",
+        { responsible: null },
+        "Work",
+      );
+      updateTaskSpy.mockRestore();
+    });
+
+    it("cancel/denial leaves the existing responsible unchanged and does not patch it", async () => {
+      mockPickResponsible.mockResolvedValue(null);
+      const updateTaskSpy = jest.spyOn(useTaskStore.getState(), "updateTask");
+      const { result } = renderHook(() => useEditTaskForm("p1", "t1"));
+
+      await act(async () => {
+        await result.current.pickResponsible();
+      });
+      expect(result.current.responsible).toEqual(sampleResponsible);
 
       await act(async () => {
         await result.current.handleSave();

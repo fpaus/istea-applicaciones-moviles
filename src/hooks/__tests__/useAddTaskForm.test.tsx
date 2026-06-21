@@ -4,6 +4,7 @@ import { useProjectStore } from "../../stores/project-store";
 import { useTaskStore } from "../../stores/task-store";
 import { imagePickerService } from "../../services/image-picker";
 import { locationService } from "../../services/location";
+import { contactsService } from "../../services/contacts";
 
 const mockBack = jest.fn();
 jest.mock("expo-router", () => ({ useRouter: () => ({ back: mockBack }) }));
@@ -13,15 +14,20 @@ jest.mock("../../services/image-picker", () => ({
 jest.mock("../../services/location", () => ({
   locationService: { getCurrentLocation: jest.fn() },
 }));
+jest.mock("../../services/contacts", () => ({
+  contactsService: { pickResponsible: jest.fn() },
+}));
 
 const mockPick = imagePickerService.pickFromLibrary as jest.Mock;
 const mockGetCurrentLocation = locationService.getCurrentLocation as jest.Mock;
+const mockPickResponsible = contactsService.pickResponsible as jest.Mock;
 
 describe("useAddTaskForm", () => {
   beforeEach(() => {
     mockBack.mockClear();
     mockPick.mockReset();
     mockGetCurrentLocation.mockReset();
+    mockPickResponsible.mockReset();
     useProjectStore.setState({
       currentProject: { id: "p1", name: "Work" },
       projects: [{ id: "p1", name: "Work" }],
@@ -255,6 +261,72 @@ describe("useAddTaskForm", () => {
         result.current.clearLocation();
       });
       expect(result.current.location).toBeNull();
+    });
+  });
+
+  describe("responsible person", () => {
+    const sampleResponsible = {
+      name: "Juan Perez",
+      contactId: "c-1",
+      phone: "12345678",
+      email: "juan@example.com",
+    };
+
+    it("pickResponsible sets responsible from the service and save includes it", async () => {
+      mockPickResponsible.mockResolvedValue(sampleResponsible);
+      const { result } = renderHook(() => useAddTaskForm());
+
+      act(() => {
+        result.current.setTitle("Has responsible");
+      });
+
+      await act(async () => {
+        await result.current.pickResponsible();
+      });
+      expect(result.current.responsible).toEqual(sampleResponsible);
+
+      await act(async () => {
+        await result.current.handleSave();
+      });
+
+      const tasks = useTaskStore.getState().tasks["p1"];
+      expect(tasks[0].responsible).toEqual(sampleResponsible);
+    });
+
+    it("leaves responsible unchanged when the picker returns null, and still saves", async () => {
+      mockPickResponsible.mockResolvedValue(null);
+      const { result } = renderHook(() => useAddTaskForm());
+
+      act(() => {
+        result.current.setTitle("No responsible");
+      });
+
+      await act(async () => {
+        await result.current.pickResponsible();
+      });
+      expect(result.current.responsible).toBeNull();
+
+      await act(async () => {
+        await result.current.handleSave();
+      });
+
+      const tasks = useTaskStore.getState().tasks["p1"];
+      expect(tasks[0].responsible).toBeNull();
+    });
+
+    it("clearResponsible clears a previously picked responsible", async () => {
+      mockPickResponsible.mockResolvedValue(sampleResponsible);
+      const { result } = renderHook(() => useAddTaskForm());
+
+      await act(async () => {
+        await result.current.pickResponsible();
+      });
+      expect(result.current.responsible).toEqual(sampleResponsible);
+
+      act(() => {
+        result.current.clearResponsible();
+      });
+      expect(result.current.responsible).toBeNull();
     });
   });
 });

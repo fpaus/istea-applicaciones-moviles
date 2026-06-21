@@ -90,6 +90,27 @@ export default function DetailScreen(): React.JSX.Element {
         </Card>
       )}
 
+      {task.responsible && (
+        <Card style={styles.metaCard}>
+          <Typography variant="caption" style={styles.metaLabel}>
+            Responsable
+          </Typography>
+          <Typography variant="body" style={styles.responsibleName}>
+            👤 {task.responsible.name}
+          </Typography>
+          {task.responsible.phone && (
+            <Typography variant="caption" style={styles.responsiblePhone}>
+              📞 {task.responsible.phone}
+            </Typography>
+          )}
+          {task.responsible.email && (
+            <Typography variant="caption" style={styles.responsibleEmail}>
+              ✉️ {task.responsible.email}
+            </Typography>
+          )}
+        </Card>
+      )}
+
       {progress.total > 0 && (
         <View style={styles.progressContainer}>
           <Typography variant="caption" style={styles.progressText}>
@@ -222,6 +243,18 @@ const styles = StyleSheet.create({
     color: "#1E293B",
   },
   locationCoords: {
+    color: "#64748B",
+    marginTop: Utility.spacing.xs,
+  },
+  responsibleName: {
+    fontWeight: "600",
+    color: "#1E293B",
+  },
+  responsiblePhone: {
+    color: "#64748B",
+    marginTop: Utility.spacing.xs,
+  },
+  responsibleEmail: {
     color: "#64748B",
     marginTop: Utility.spacing.xs,
   },
