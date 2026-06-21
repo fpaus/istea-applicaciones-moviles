@@ -1,6 +1,7 @@
 import { useRouter } from "expo-router";
 import { useCallback, useState } from "react";
 import { imagePickerService } from "../services/image-picker";
+import { locationService } from "../services/location";
 import { useTaskActions } from "./useTaskActions";
 
 export interface UseAddTaskFormResult {
@@ -19,6 +20,11 @@ export interface UseAddTaskFormResult {
   imageUri: string | null;
   pickImage: () => Promise<void>;
   removeImage: () => void;
+  location: { latitude: number; longitude: number; label?: string } | null;
+  setLocation: (location: { latitude: number; longitude: number; label?: string } | null) => void;
+  isLocating: boolean;
+  captureLocation: () => Promise<void>;
+  clearLocation: () => void;
   isFormValid: boolean;
   handleSave: () => Promise<void>;
 }
@@ -38,6 +44,8 @@ export function useAddTaskForm(): UseAddTaskFormResult {
   const [minute, setMinute] = useState<number | null>(null);
   const [repeats, setRepeats] = useState(false);
   const [imageUri, setImageUri] = useState<string | null>(null);
+  const [location, setLocation] = useState<{ latitude: number; longitude: number; label?: string } | null>(null);
+  const [isLocating, setIsLocating] = useState(false);
 
   const isFormValid =
     title.trim() !== "" &&
@@ -51,6 +59,18 @@ export function useAddTaskForm(): UseAddTaskFormResult {
   }, []);
 
   const removeImage = useCallback(() => setImageUri(null), []);
+
+  const captureLocation = useCallback(async () => {
+    setIsLocating(true);
+    try {
+      const loc = await locationService.getCurrentLocation();
+      if (loc) setLocation(loc);
+    } finally {
+      setIsLocating(false);
+    }
+  }, []);
+
+  const clearLocation = useCallback(() => setLocation(null), []);
 
   const handleSave = useCallback(async () => {
     if (title.trim() === "") return;
@@ -68,6 +88,7 @@ export function useAddTaskForm(): UseAddTaskFormResult {
             }
           : null,
       imageUri,
+      location,
     });
 
     setTitle("");
@@ -77,9 +98,10 @@ export function useAddTaskForm(): UseAddTaskFormResult {
     setMinute(null);
     setRepeats(false);
     setImageUri(null);
+    setLocation(null);
 
     router.back();
-  }, [addTask, router, title, description, hasReminder, hour, minute, repeats, imageUri]);
+  }, [addTask, router, title, description, hasReminder, hour, minute, repeats, imageUri, location]);
 
   return {
     title,
@@ -97,6 +119,11 @@ export function useAddTaskForm(): UseAddTaskFormResult {
     imageUri,
     pickImage,
     removeImage,
+    location,
+    setLocation,
+    isLocating,
+    captureLocation,
+    clearLocation,
     isFormValid,
     handleSave,
   };

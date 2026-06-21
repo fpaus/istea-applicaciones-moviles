@@ -102,4 +102,29 @@ describe("task store — persistence", () => {
       "file:///persisted-photo.jpg",
     );
   });
+
+  it("preserves a task's location across the persist/merge round-trip", async () => {
+    const store = createTaskStore({ notifications: fakeNotifications() });
+    // Let initial (empty) rehydration settle so it doesn't clobber the add below.
+    await store.persist.rehydrate();
+    const sampleLocation = {
+      latitude: -34.6037,
+      longitude: -58.3816,
+      label: "Obelisco",
+    };
+    await store.getState().addTask("project-1", "Work", {
+      ...input,
+      location: sampleLocation,
+    });
+    await flush();
+
+    const raw = await AsyncStorage.getItem("task-store");
+    const parsed = JSON.parse(raw as string);
+    expect(parsed.state.tasks["project-1"][0].location).toEqual(sampleLocation);
+
+    // Rehydrate into a fresh store and confirm the value survives the merge.
+    const rehydrated = createTaskStore({ notifications: fakeNotifications() });
+    await rehydrated.persist.rehydrate();
+    expect(rehydrated.getState().tasks["project-1"][0].location).toEqual(sampleLocation);
+  });
 });

@@ -87,3 +87,44 @@ describe("CardItem image thumbnail", () => {
     expect(queryByTestId("task-thumbnail-t1")).toBeNull();
   });
 });
+
+describe("CardItem location indicator", () => {
+  it("renders a location indicator when the task has a location", () => {
+    const withLocation: Task = {
+      ...task,
+      location: {
+        latitude: -34.6037,
+        longitude: -58.3816,
+        label: "Obelisco",
+      },
+    };
+    const { getByText } = render(
+      <CardItem item={withLocation} onMarkCompleted={noop} onDelete={noop} />,
+    );
+
+    expect(getByText("📍 Obelisco")).toBeTruthy();
+  });
+
+  it("renders coordinates if label is not provided", () => {
+    const withLocationNoLabel: Task = {
+      ...task,
+      location: {
+        latitude: -34.6037,
+        longitude: -58.3816,
+      },
+    };
+    const { getByText } = render(
+      <CardItem item={withLocationNoLabel} onMarkCompleted={noop} onDelete={noop} />,
+    );
+
+    expect(getByText("📍 -34.6037, -58.3816")).toBeTruthy();
+  });
+
+  it("renders no location indicator when the task has no location", () => {
+    const { queryByText } = render(
+      <CardItem item={task} onMarkCompleted={noop} onDelete={noop} />,
+    );
+
+    expect(queryByText(/📍/)).toBeNull();
+  });
+});

@@ -3,6 +3,7 @@ import { useCallback, useState } from "react";
 import { useTaskStore } from "../stores/task-store";
 import { useProjectStore } from "../stores/project-store";
 import { imagePickerService } from "../services/image-picker";
+import { locationService } from "../services/location";
 import { Task } from "../types";
 
 const EMPTY_ARRAY: Task[] = [];
@@ -23,6 +24,11 @@ export interface UseEditTaskFormResult {
   imageUri: string | null;
   pickImage: () => Promise<void>;
   removeImage: () => void;
+  location: { latitude: number; longitude: number; label?: string } | null;
+  setLocation: (location: { latitude: number; longitude: number; label?: string } | null) => void;
+  isLocating: boolean;
+  captureLocation: () => Promise<void>;
+  clearLocation: () => void;
   isFormValid: boolean;
   handleSave: () => Promise<void>;
 }
@@ -56,6 +62,10 @@ export function useEditTaskForm(
   const [imageUri, setImageUri] = useState<string | null>(
     oldTask?.imageUri ?? null,
   );
+  const [location, setLocation] = useState<{ latitude: number; longitude: number; label?: string } | null>(
+    oldTask?.location ?? null,
+  );
+  const [isLocating, setIsLocating] = useState(false);
 
   const isFormValid =
     title.trim() !== "" &&
@@ -70,6 +80,18 @@ export function useEditTaskForm(
 
   const removeImage = useCallback(() => setImageUri(null), []);
 
+  const captureLocation = useCallback(async () => {
+    setIsLocating(true);
+    try {
+      const loc = await locationService.getCurrentLocation();
+      if (loc) setLocation(loc);
+    } finally {
+      setIsLocating(false);
+    }
+  }, []);
+
+  const clearLocation = useCallback(() => setLocation(null), []);
+
   const handleSave = useCallback(async () => {
     if (!oldTask) return;
     if (title.trim() === "") return;
@@ -82,6 +104,21 @@ export function useEditTaskForm(
     // the store distinguishes from "unchanged" (undefined).
     if ((imageUri ?? null) !== (oldTask.imageUri ?? null)) {
       patch.imageUri = imageUri;
+    }
+
+    const oldLoc = oldTask.location ?? null;
+    const newLoc = location ?? null;
+    const locationChanged =
+      (!oldLoc && newLoc) ||
+      (oldLoc && !newLoc) ||
+      (oldLoc && newLoc && (
+        oldLoc.latitude !== newLoc.latitude ||
+        oldLoc.longitude !== newLoc.longitude ||
+        oldLoc.label !== newLoc.label
+      ));
+
+    if (locationChanged) {
+      patch.location = location;
     }
 
     if (!hasReminder) {
@@ -130,6 +167,7 @@ export function useEditTaskForm(
     minute,
     repeats,
     imageUri,
+    location,
     oldTask,
     projectName,
   ]);
@@ -150,6 +188,11 @@ export function useEditTaskForm(
     imageUri,
     pickImage,
     removeImage,
+    location,
+    setLocation,
+    isLocating,
+    captureLocation,
+    clearLocation,
     isFormValid,
     handleSave,
   };

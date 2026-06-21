@@ -56,4 +56,45 @@ describe("DetailScreen subtask completion", () => {
       expect(c1?.completed).toBe(true);
     });
   });
+
+  it("renders location details when location is present on the task", () => {
+    useTaskStore.setState({
+      tasks: {
+        p1: [
+          makeTask({
+            id: "t1",
+            title: "Parent",
+            location: {
+              latitude: -34.6037,
+              longitude: -58.3816,
+              label: "Obelisco",
+            },
+          }),
+        ],
+      },
+      hasHydrated: true,
+    });
+
+    const { getByText } = render(<DetailScreen />);
+    expect(getByText("📍 Obelisco")).toBeTruthy();
+    expect(getByText("-34.603700, -58.381600")).toBeTruthy();
+  });
+
+  it("does not render location details when location is absent", () => {
+    useTaskStore.setState({
+      tasks: {
+        p1: [
+          makeTask({
+            id: "t1",
+            title: "Parent",
+            location: null,
+          }),
+        ],
+      },
+      hasHydrated: true,
+    });
+
+    const { queryByText } = render(<DetailScreen />);
+    expect(queryByText("Ubicación")).toBeNull();
+  });
 });

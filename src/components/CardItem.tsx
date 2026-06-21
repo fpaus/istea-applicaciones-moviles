@@ -50,6 +50,13 @@ export function CardItem({
       <Typography variant="body" style={styles.description}>
         {item.description}
       </Typography>
+      {item.location && (
+        <View style={styles.locationIndicator}>
+          <Typography variant="caption" style={styles.locationText}>
+            📍 {item.location.label || `${item.location.latitude.toFixed(4)}, ${item.location.longitude.toFixed(4)}`}
+          </Typography>
+        </View>
+      )}
       {childrenCount !== undefined && childrenCount > 0 && (
         <View style={styles.progressContainer}>
           <Typography variant="caption" style={styles.progressText}>
@@ -171,5 +178,14 @@ const styles = StyleSheet.create({
   deleteBtn: {
     paddingVertical: 6,
     paddingHorizontal: 12,
+  },
+  locationIndicator: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: Utility.spacing.m,
+  },
+  locationText: {
+    color: "#64748B",
+    fontSize: 12,
   },
 });

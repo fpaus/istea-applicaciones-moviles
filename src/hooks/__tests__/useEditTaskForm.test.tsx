@@ -3,19 +3,25 @@ import { useProjectStore } from "../../stores/project-store";
 import { useTaskStore } from "../../stores/task-store";
 import { useEditTaskForm } from "../useEditTaskForm";
 import { imagePickerService } from "../../services/image-picker";
+import { locationService } from "../../services/location";
 
 const mockBack = jest.fn();
 jest.mock("expo-router", () => ({ useRouter: () => ({ back: mockBack }) }));
 jest.mock("../../services/image-picker", () => ({
   imagePickerService: { pickFromLibrary: jest.fn() },
 }));
+jest.mock("../../services/location", () => ({
+  locationService: { getCurrentLocation: jest.fn() },
+}));
 
 const mockPick = imagePickerService.pickFromLibrary as jest.Mock;
+const mockGetCurrentLocation = locationService.getCurrentLocation as jest.Mock;
 
 describe("useEditTaskForm", () => {
   beforeEach(() => {
     mockBack.mockClear();
     mockPick.mockReset();
+    mockGetCurrentLocation.mockReset();
     useProjectStore.setState({
       currentProject: { id: "p1", name: "Work" },
       projects: [{ id: "p1", name: "Work" }],
@@ -353,6 +359,108 @@ describe("useEditTaskForm", () => {
         await result.current.pickImage();
       });
       expect(result.current.imageUri).toBe("file:///existing.jpg");
+
+      await act(async () => {
+        await result.current.handleSave();
+      });
+
+      // Nothing changed at all → updateTask not called.
+      expect(updateTaskSpy).not.toHaveBeenCalled();
+      expect(mockBack).toHaveBeenCalledTimes(1);
+      updateTaskSpy.mockRestore();
+    });
+  });
+
+  describe("location attachment", () => {
+    const sampleLocation = {
+      latitude: -34.6037,
+      longitude: -58.3816,
+      label: "Obelisco",
+    };
+
+    beforeEach(() => {
+      useTaskStore.setState({
+        tasks: {
+          p1: [
+            {
+              id: "t1",
+              title: "Task 1",
+              description: "Old description",
+              notification: null,
+              completed: false,
+              createdAt: 100,
+              location: sampleLocation,
+            },
+          ],
+        },
+        hasHydrated: true,
+      });
+    });
+
+    it("pre-fills location from the existing task", () => {
+      const { result } = renderHook(() => useEditTaskForm("p1", "t1"));
+      expect(result.current.location).toEqual(sampleLocation);
+    });
+
+    it("captureLocation replaces the location and save patches the new location", async () => {
+      const newLoc = {
+        latitude: -34.521,
+        longitude: -58.5,
+        label: "Vicente López",
+      };
+      mockGetCurrentLocation.mockResolvedValue(newLoc);
+      const updateTaskSpy = jest.spyOn(useTaskStore.getState(), "updateTask");
+      const { result } = renderHook(() => useEditTaskForm("p1", "t1"));
+
+      await act(async () => {
+        await result.current.captureLocation();
+      });
+      expect(result.current.location).toEqual(newLoc);
+
+      await act(async () => {
+        await result.current.handleSave();
+      });
+
+      expect(updateTaskSpy).toHaveBeenCalledWith(
+        "p1",
+        "t1",
+        { location: newLoc },
+        "Work",
+      );
+      updateTaskSpy.mockRestore();
+    });
+
+    it("clearLocation clears the location and save patches location: null", async () => {
+      const updateTaskSpy = jest.spyOn(useTaskStore.getState(), "updateTask");
+      const { result } = renderHook(() => useEditTaskForm("p1", "t1"));
+
+      act(() => {
+        result.current.clearLocation();
+      });
+      expect(result.current.location).toBeNull();
+
+      await act(async () => {
+        await result.current.handleSave();
+      });
+
+      expect(updateTaskSpy).toHaveBeenCalledWith(
+        "p1",
+        "t1",
+        { location: null },
+        "Work",
+      );
+      updateTaskSpy.mockRestore();
+    });
+
+    it("cancel/denial leaves the existing location unchanged and does not patch it", async () => {
+      mockGetCurrentLocation.mockResolvedValue(null);
+      const updateTaskSpy = jest.spyOn(useTaskStore.getState(), "updateTask");
+      const { result } = renderHook(() => useEditTaskForm("p1", "t1"));
+
+      await act(async () => {
+        await result.current.captureLocation();
+      });
+      expect(result.current.location).toEqual(sampleLocation);
 
       await act(async () => {
         await result.current.handleSave();

@@ -3,19 +3,25 @@ import { useAddTaskForm } from "../useAddTaskForm";
 import { useProjectStore } from "../../stores/project-store";
 import { useTaskStore } from "../../stores/task-store";
 import { imagePickerService } from "../../services/image-picker";
+import { locationService } from "../../services/location";
 
 const mockBack = jest.fn();
 jest.mock("expo-router", () => ({ useRouter: () => ({ back: mockBack }) }));
 jest.mock("../../services/image-picker", () => ({
   imagePickerService: { pickFromLibrary: jest.fn() },
 }));
+jest.mock("../../services/location", () => ({
+  locationService: { getCurrentLocation: jest.fn() },
+}));
 
 const mockPick = imagePickerService.pickFromLibrary as jest.Mock;
+const mockGetCurrentLocation = locationService.getCurrentLocation as jest.Mock;
 
 describe("useAddTaskForm", () => {
   beforeEach(() => {
     mockBack.mockClear();
     mockPick.mockReset();
+    mockGetCurrentLocation.mockReset();
     useProjectStore.setState({
       currentProject: { id: "p1", name: "Work" },
       projects: [{ id: "p1", name: "Work" }],
@@ -177,6 +183,78 @@ describe("useAddTaskForm", () => {
         result.current.removeImage();
       });
       expect(result.current.imageUri).toBeNull();
+    });
+  });
+
+  describe("location attachment", () => {
+    it("captureLocation sets location from the service and save includes it", async () => {
+      const sampleLocation = {
+        latitude: -34.6037,
+        longitude: -58.3816,
+        label: "Obelisco",
+      };
+      mockGetCurrentLocation.mockResolvedValue(sampleLocation);
+      const { result } = renderHook(() => useAddTaskForm());
+
+      act(() => {
+        result.current.setTitle("Has location");
+      });
+
+      await act(async () => {
+        await result.current.captureLocation();
+      });
+      expect(result.current.location).toEqual(sampleLocation);
+      expect(result.current.isLocating).toBe(false);
+
+      await act(async () => {
+        await result.current.handleSave();
+      });
+
+      const tasks = useTaskStore.getState().tasks["p1"];
+      expect(tasks[0].location).toEqual(sampleLocation);
+    });
+
+    it("leaves location unchanged when the service returns null, and still saves", async () => {
+      mockGetCurrentLocation.mockResolvedValue(null);
+      const { result } = renderHook(() => useAddTaskForm());
+
+      act(() => {
+        result.current.setTitle("No location");
+      });
+
+      await act(async () => {
+        await result.current.captureLocation();
+      });
+      expect(result.current.location).toBeNull();
+
+      await act(async () => {
+        await result.current.handleSave();
+      });
+
+      const tasks = useTaskStore.getState().tasks["p1"];
+      expect(tasks).toHaveLength(1);
+      expect(tasks[0].location).toBeNull();
+      expect(mockBack).toHaveBeenCalledTimes(1);
+    });
+
+    it("clearLocation clears a previously captured location", async () => {
+      const sampleLocation = {
+        latitude: -34.6037,
+        longitude: -58.3816,
+        label: "Obelisco",
+      };
+      mockGetCurrentLocation.mockResolvedValue(sampleLocation);
+      const { result } = renderHook(() => useAddTaskForm());
+
+      await act(async () => {
+        await result.current.captureLocation();
+      });
+      expect(result.current.location).toEqual(sampleLocation);
+
+      act(() => {
+        result.current.clearLocation();
+      });
+      expect(result.current.location).toBeNull();
     });
   });
 });

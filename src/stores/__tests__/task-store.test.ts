@@ -833,4 +833,102 @@ describe("task store", () => {
       expect(task.imageUri).toBe("file:///keep.jpg");
     });
   });
+
+  describe("location attachment (location)", () => {
+    const sampleLocation = {
+      latitude: -34.6037,
+      longitude: -58.3816,
+      label: "Obelisco, Buenos Aires",
+    };
+
+    it("addTask persists the location from the input", async () => {
+      const notifications = makeFakeNotifications();
+      const store = makeStore(notifications);
+
+      await store.getState().addTask("project-1", "Work", {
+        title: "With location",
+        description: "",
+        notification: null,
+        location: sampleLocation,
+      });
+
+      expect(store.getState().tasks["project-1"][0].location).toEqual(sampleLocation);
+    });
+
+    it("addTask defaults location to null when absent", async () => {
+      const notifications = makeFakeNotifications();
+      const store = makeStore(notifications);
+
+      await store.getState().addTask("project-1", "Work", {
+        title: "No location",
+        description: "",
+        notification: null,
+      });
+
+      expect(store.getState().tasks["project-1"][0].location).toBeNull();
+    });
+
+    it("updateTask replaces the location with a new value", async () => {
+      const notifications = makeFakeNotifications();
+      const store = makeStore(notifications);
+
+      await store.getState().addTask("project-1", "Work", {
+        title: "Task location",
+        description: "",
+        notification: null,
+        location: sampleLocation,
+      });
+      const id = store.getState().tasks["project-1"][0].id;
+
+      const newLocation = {
+        latitude: -34.521,
+        longitude: -58.5,
+        label: "Vicente López",
+      };
+
+      await store.getState().updateTask("project-1", id, {
+        location: newLocation,
+      });
+
+      expect(store.getState().tasks["project-1"][0].location).toEqual(newLocation);
+    });
+
+    it("updateTask can clear the location to null", async () => {
+      const notifications = makeFakeNotifications();
+      const store = makeStore(notifications);
+
+      await store.getState().addTask("project-1", "Work", {
+        title: "Task location",
+        description: "",
+        notification: null,
+        location: sampleLocation,
+      });
+      const id = store.getState().tasks["project-1"][0].id;
+
+      await store.getState().updateTask("project-1", id, {
+        location: null,
+      });
+
+      expect(store.getState().tasks["project-1"][0].location).toBeNull();
+    });
+
+    it("updateTask leaves location unchanged when the patch omits it", async () => {
+      const notifications = makeFakeNotifications();
+      const store = makeStore(notifications);
+
+      await store.getState().addTask("project-1", "Work", {
+        title: "Task location",
+        description: "",
+        notification: null,
+        location: sampleLocation,
+      });
+      const id = store.getState().tasks["project-1"][0].id;
+
+      await store.getState().updateTask("project-1", id, { title: "Renamed" });
+
+      const task = store.getState().tasks["project-1"][0];
+      expect(task.title).toBe("Renamed");
+      expect(task.location).toEqual(sampleLocation);
+    });
+  });
 });

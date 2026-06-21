@@ -121,10 +121,15 @@ interface Task {
   createdAt: number;          // epoch ms
   parentId?: string | null;   // parent task ID (null/absent for root tasks)
   imageUri?: string | null;   // local device URI for a single attached image (null/absent = none)
+  location?: {                // device GPS coordinates + best-effort address label (null/absent = none)
+    latitude: number;
+    longitude: number;
+    label?: string;
+  } | null;
 }
 ```
 
-`NewTask` (input to create) = `{ title, description, notification?, parentId?, imageUri? }`.
+`NewTask` (input to create) = `{ title, description, notification?, parentId?, imageUri?, location? }`.
 
 ### AsyncStorage keys
 
@@ -162,6 +167,13 @@ Written by each store's `persist` middleware (JSON-serialized store state):
 - **Gallery only, native** (`ImagePickerService`): `requestPermission()` (photo-library) and `pickFromLibrary()` wrap `expo-image-picker`. There is intentionally no camera method.
 - **Resilient**: every method is wrapped in try/catch and returns `null` (or `false`) rather than throwing, so a denied permission or a cancelled/failed pick never blocks saving the task — it simply saves with no image (mirrors the notification-rejection fallback).
 - **Native-only, no web guard**: unlike `NotificationService`, the service does not guard `Platform.OS !== "web"`; image features are out of scope on web.
+
+### Location (local, native-only)
+- **Device Location** (`LocationService`): `requestPermission()` (foreground location) and `getCurrentLocation(timeoutMs, geocodeTimeoutMs)` wrap `expo-location`.
+- **Resilient**: every method is wrapped in try/catch and returns `null` (or `false`) rather than throwing, so a denied permission or a timed-out GPS fix never blocks saving the task — it simply saves with no location (similar to notification/image picker fallbacks).
+- **Optional label**: best-effort reverse-geocoding label is generated if available; a failure/timeout fallback to raw coordinates does not block location capture.
+- **Form capture**: `useAddTaskForm` and `useEditTaskForm` hooks capture device location or allow manual coordinates entry (with optional label) via `LocationSelectionModal`, presenting coordinates and label readout to the user, allowing updating or removing it entirely.
+- **Display**: read-only location display on the detail view (`detail.tsx`) and as a small indicator (📍 pin + label or coordinates) on the dashboard `CardItem`.
 
 ### Notifications (local)
 - Permission requested on demand; Android uses a `"tasks"` channel
@@ -231,6 +243,7 @@ touches the affected area:
 - **No project archiving.** Projects can be renamed and deleted (delete cascades to their tasks + notifications), but there is no archiving, color/metadata, reordering, bulk delete, or undo.
 - **No task undo flow.** Once a task is completed or deleted, its scheduled OS notification is immediately canceled, and there is no "undo" recovery flow.
 - **Image attachments are local URIs.** A task's `imageUri` is a device-local file URI — there is no upload/cloud copy, no in-app cropping/filters, no multiple images, and no camera capture (gallery only). The URI can become **stale** if the OS clears its cached picker files; a missing image degrades gracefully to no image (the surfaces render nothing).
+- **No map UI for location.** A task's `location` is coordinates-only (latitude and longitude) with a best-effort text label. There is no map view rendering, no location search input, and no geofencing/location-triggered reminders. Web support for location is out of scope.
 
 ## 7. Planned / future features (intended direction)
 

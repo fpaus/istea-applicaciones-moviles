@@ -5,7 +5,9 @@ import { NumberInput } from "@/src/components/ui/NumberInput";
 import { Typography } from "@/src/components/ui/Typography";
 import { Colors, Utility } from "@/src/constants/theme";
 import { useAddTaskForm } from "@/src/hooks/useAddTaskForm";
+import { LocationSelectionModal } from "@/src/components/LocationSelectionModal";
 import { Image } from "expo-image";
+import { useState } from "react";
 import {
   ScrollView,
   StyleSheet,
@@ -30,9 +32,16 @@ export default function AddScreen() {
     imageUri,
     pickImage,
     removeImage,
+    location,
+    setLocation,
+    isLocating,
+    captureLocation,
+    clearLocation,
     isFormValid,
     handleSave,
   } = useAddTaskForm();
+
+  const [modalVisible, setModalVisible] = useState(false);
 
   return (
     <KeyboardAvoidingContainer style={styles.flex}>
@@ -125,6 +134,47 @@ export default function AddScreen() {
         )}
       </View>
 
+      <View style={styles.locationSection}>
+        <View style={styles.locationButtonsRow}>
+          <Button
+            title={isLocating ? "Buscando..." : "Ubicación actual"}
+            variant="outline"
+            onPress={captureLocation}
+            disabled={isLocating}
+            style={styles.locationBtn}
+          />
+          <Button
+            title="Seleccionar..."
+            variant="outline"
+            onPress={() => setModalVisible(true)}
+            disabled={isLocating}
+            style={styles.locationBtn}
+          />
+        </View>
+        {location && (
+          <View style={styles.locationPreview}>
+            <Typography variant="body" style={styles.locationLabel}>
+              📍 {location.label || "Ubicación seleccionada"}
+            </Typography>
+            <Typography variant="caption" style={styles.locationCoords}>
+              {location.latitude.toFixed(6)}, {location.longitude.toFixed(6)}
+            </Typography>
+            <Button
+              title="Quitar ubicación"
+              variant="outline"
+              onPress={clearLocation}
+              style={styles.removeLocationBtn}
+            />
+          </View>
+        )}
+      </View>
+
+      <LocationSelectionModal
+        visible={modalVisible}
+        onClose={() => setModalVisible(false)}
+        onSelect={(lat, lon, label) => setLocation({ latitude: lat, longitude: lon, label })}
+      />
+
       <Button
         title="Guardar Tarea"
         onPress={handleSave}
@@ -181,5 +231,34 @@ const styles = StyleSheet.create({
   },
   removeImageBtn: {
     marginTop: Utility.spacing.s,
+  },
+  locationSection: {
+    marginTop: Utility.spacing.l,
+  },
+  locationPreview: {
+    marginTop: Utility.spacing.m,
+    padding: Utility.spacing.m,
+    borderRadius: 8,
+    backgroundColor: "#F1F5F9",
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+  },
+  locationLabel: {
+    fontWeight: "600",
+    color: "#1E293B",
+  },
+  locationCoords: {
+    color: "#64748B",
+    marginTop: Utility.spacing.xs,
+  },
+  removeLocationBtn: {
+    marginTop: Utility.spacing.m,
+  },
+  locationButtonsRow: {
+    flexDirection: "row",
+    gap: Utility.spacing.s,
+  },
+  locationBtn: {
+    flex: 1,
   },
 });

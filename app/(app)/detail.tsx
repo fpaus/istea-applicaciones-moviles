@@ -76,6 +76,20 @@ export default function DetailScreen(): React.JSX.Element {
         </Typography>
       </Card>
 
+      {task.location && (
+        <Card style={styles.metaCard}>
+          <Typography variant="caption" style={styles.metaLabel}>
+            Ubicación
+          </Typography>
+          <Typography variant="body" style={styles.locationLabel}>
+            📍 {task.location.label || "Coordenadas"}
+          </Typography>
+          <Typography variant="caption" style={styles.locationCoords}>
+            {task.location.latitude.toFixed(6)}, {task.location.longitude.toFixed(6)}
+          </Typography>
+        </Card>
+      )}
+
       {progress.total > 0 && (
         <View style={styles.progressContainer}>
           <Typography variant="caption" style={styles.progressText}>
@@ -202,5 +216,13 @@ const styles = StyleSheet.create({
   },
   notFoundText: {
     color: "#666",
+  },
+  locationLabel: {
+    fontWeight: "600",
+    color: "#1E293B",
+  },
+  locationCoords: {
+    color: "#64748B",
+    marginTop: Utility.spacing.xs,
   },
 });

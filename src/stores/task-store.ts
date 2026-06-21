@@ -176,6 +176,7 @@ export const createTaskState =
         createdAt: Date.now(),
         parentId: data.parentId ?? null,
         imageUri: data.imageUri ?? null,
+        location: data.location ?? null,
       };
 
       const projectTasks = get().tasks[projectId] || [];
@@ -335,12 +336,18 @@ export const createTaskState =
       const nextImageUri =
         patch.imageUri !== undefined ? patch.imageUri : oldTask.imageUri;
 
+      // `location` is also an explicit clear vs. unchanged distinction: `undefined`
+      // means "leave as-is", `null` means "remove the location".
+      const nextLocation =
+        patch.location !== undefined ? patch.location : oldTask.location;
+
       const updatedTask: Task = {
         ...oldTask,
         title: nextTitle,
         description: nextDescription,
         notification: nextNotification,
         imageUri: nextImageUri,
+        location: nextLocation,
       };
 
       const nextTasks = [...projectTasks];
