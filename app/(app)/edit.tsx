@@ -1,6 +1,7 @@
 import { CardItem } from "@/src/components/CardItem";
 import { Button } from "@/src/components/ui/Button";
 import { Input } from "@/src/components/ui/Input";
+import { KeyboardAvoidingContainer } from "@/src/components/ui/KeyboardAvoidingContainer";
 import { NumberInput } from "@/src/components/ui/NumberInput";
 import { Typography } from "@/src/components/ui/Typography";
 import { Colors, Utility } from "@/src/constants/theme";
@@ -11,7 +12,12 @@ import { useTaskStore } from "@/src/stores/task-store";
 import { Task } from "@/src/types";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useCallback, useRef, useState } from "react";
-import { ScrollView, StyleSheet, Switch, View } from "react-native";
+import {
+  ScrollView,
+  StyleSheet,
+  Switch,
+  View,
+} from "react-native";
 
 const EMPTY_TASKS: Task[] = [];
 
@@ -152,7 +158,13 @@ export default function EditScreen(): React.JSX.Element {
   };
 
   return (
-    <ScrollView ref={scrollViewRef} style={styles.container}>
+    <KeyboardAvoidingContainer style={styles.flex}>
+      <ScrollView
+        ref={scrollViewRef}
+        style={styles.container}
+        contentContainerStyle={styles.content}
+        keyboardShouldPersistTaps="handled"
+      >
       <Typography variant="h2" style={styles.title}>
         Editar Tarea
       </Typography>
@@ -314,15 +326,22 @@ export default function EditScreen(): React.JSX.Element {
         style={styles.addSubtaskBtn}
         disabled={!isSubtaskFormValid}
       />
-    </ScrollView>
+      </ScrollView>
+    </KeyboardAvoidingContainer>
   );
 }
 
 const styles = StyleSheet.create({
+  flex: {
+    flex: 1,
+    backgroundColor: Colors.light.background,
+  },
   container: {
     flex: 1,
-    padding: Utility.spacing.m,
     backgroundColor: Colors.light.background,
+  },
+  content: {
+    padding: Utility.spacing.m,
   },
   title: {
     marginBottom: Utility.spacing.l,

@@ -78,6 +78,12 @@ export default function Index() {
               item={item}
               onMarkCompleted={item.completed ? reopenTask : completeTask}
               onDelete={deleteTask}
+              onOpen={(id) => {
+                router.push({
+                  pathname: "/detail",
+                  params: { projectId, taskId: id },
+                });
+              }}
               onEdit={(id) => {
                 router.push({
                   pathname: "/edit",

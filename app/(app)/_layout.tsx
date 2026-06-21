@@ -25,6 +25,13 @@ export default function AppLayout() {
         }}
       />
       <Stack.Screen
+        name="detail"
+        options={{
+          title: "Detalle de Tarea",
+          headerBackTitle: "Volver",
+        }}
+      />
+      <Stack.Screen
         name="edit"
         options={{
           title: "Editar Tarea",

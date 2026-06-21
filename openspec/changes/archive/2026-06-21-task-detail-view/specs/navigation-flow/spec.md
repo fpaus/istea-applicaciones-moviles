@@ -30,11 +30,13 @@ continue to work and SHALL NOT trigger navigation to the detail screen.
 - **THEN** the corresponding action runs
 - **AND** the app does not navigate to the read-only detail screen
 
-### Requirement: The detail view lists subtasks read-only and is navigable
+### Requirement: The detail view lists subtasks with completion and navigation
 
 When a task has direct subtasks, its detail screen SHALL show its direct-children
-progress indicator and SHALL list those subtasks read-only. Tapping a listed
-subtask SHALL open that subtask's own detail screen.
+progress indicator and SHALL list those subtasks. Each listed subtask SHALL expose
+a completion control that marks it done or reopens it, applying the same completion
+invariant and cascade behavior as the rest of the app. Tapping a listed subtask
+outside its completion control SHALL open that subtask's own detail screen.
 
 #### Scenario: Detail view shows direct-children progress
 
@@ -42,10 +44,16 @@ subtask SHALL open that subtask's own detail screen.
 - **WHEN** its detail screen is shown
 - **THEN** the screen shows progress for 1 of 3 direct children
 
+#### Scenario: Completing a subtask from the detail view
+
+- **GIVEN** a task's detail screen listing an incomplete subtask
+- **WHEN** the user toggles that subtask's completion control
+- **THEN** that subtask becomes completed
+
 #### Scenario: Opening a subtask from the detail view
 
 - **GIVEN** a task's detail screen listing its subtasks
-- **WHEN** the user taps a subtask
+- **WHEN** the user taps a subtask outside its completion control
 - **THEN** the app navigates to that subtask's detail screen
 
 ### Requirement: The detail view tolerates a missing task

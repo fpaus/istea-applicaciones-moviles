@@ -1,5 +1,5 @@
 import React from "react";
-import { View, Switch, StyleSheet } from "react-native";
+import { View, Switch, StyleSheet, Pressable } from "react-native";
 import { Card } from "@/src/components/ui/Card";
 import { Typography } from "@/src/components/ui/Typography";
 import { Button } from "@/src/components/ui/Button";
@@ -11,6 +11,8 @@ interface CardItemProps {
   onMarkCompleted: (id: string) => void;
   onDelete: (id: string) => void;
   onEdit?: (id: string) => void;
+  /** When provided, the card body (title/description) opens the read-only detail. */
+  onOpen?: (id: string) => void;
   childrenCount?: number;
   completedChildrenCount?: number;
 }
@@ -20,13 +22,16 @@ export function CardItem({
   onMarkCompleted,
   onDelete,
   onEdit,
+  onOpen,
   childrenCount,
   completedChildrenCount,
 }: CardItemProps) {
-  return (
-    <Card style={styles.card}>
+  const body = (
+    <>
       <View style={styles.cardHeader}>
-        <Typography variant="h3">{item.title}</Typography>
+        <Typography variant="h3" style={styles.titleText}>
+          {item.title}
+        </Typography>
         <Switch
           value={item.completed}
           onValueChange={() => onMarkCompleted(item.id)}
@@ -50,6 +55,21 @@ export function CardItem({
             />
           </View>
         </View>
+      )}
+    </>
+  );
+
+  return (
+    <Card style={styles.card}>
+      {onOpen ? (
+        <Pressable
+          testID={`task-card-body-${item.id}`}
+          onPress={() => onOpen(item.id)}
+        >
+          {body}
+        </Pressable>
+      ) : (
+        body
       )}
       <View style={styles.cardFooter}>
         {item.notification ? (
@@ -91,6 +111,10 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "center",
     marginBottom: Utility.spacing.xs,
+  },
+  titleText: {
+    flex: 1,
+    marginRight: Utility.spacing.s,
   },
   description: {
     marginBottom: Utility.spacing.m,

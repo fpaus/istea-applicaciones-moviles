@@ -1,10 +1,16 @@
 import { Button } from "@/src/components/ui/Button";
 import { Input } from "@/src/components/ui/Input";
+import { KeyboardAvoidingContainer } from "@/src/components/ui/KeyboardAvoidingContainer";
 import { NumberInput } from "@/src/components/ui/NumberInput";
 import { Typography } from "@/src/components/ui/Typography";
 import { Colors, Utility } from "@/src/constants/theme";
 import { useAddTaskForm } from "@/src/hooks/useAddTaskForm";
-import { ScrollView, StyleSheet, Switch, View } from "react-native";
+import {
+  ScrollView,
+  StyleSheet,
+  Switch,
+  View,
+} from "react-native";
 
 export default function AddScreen() {
   const {
@@ -25,10 +31,15 @@ export default function AddScreen() {
   } = useAddTaskForm();
 
   return (
-    <ScrollView style={styles.container}>
-      <Typography variant="h2" style={styles.title}>
-        Crear Nueva Tarea
-      </Typography>
+    <KeyboardAvoidingContainer style={styles.flex}>
+      <ScrollView
+        style={styles.container}
+        contentContainerStyle={styles.content}
+        keyboardShouldPersistTaps="handled"
+      >
+        <Typography variant="h2" style={styles.title}>
+          Crear Nueva Tarea
+        </Typography>
 
       <Input
         label="Título"
@@ -93,15 +104,23 @@ export default function AddScreen() {
         style={styles.saveBtn}
         disabled={!isFormValid}
       />
-    </ScrollView>
+      </ScrollView>
+    </KeyboardAvoidingContainer>
   );
 }
 
 const styles = StyleSheet.create({
+  flex: {
+    flex: 1,
+    backgroundColor: Colors.light.background,
+  },
   container: {
     flex: 1,
-    padding: Utility.spacing.m,
     backgroundColor: Colors.light.background,
+  },
+  content: {
+    padding: Utility.spacing.m,
+    paddingBottom: Utility.spacing.xl,
   },
   title: {
     marginBottom: Utility.spacing.l,

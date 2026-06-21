@@ -10,7 +10,7 @@ canvas where each new attribute is displayed, so it must exist first.
 
 - Add a **read-only task detail screen** reachable by tapping a task card on the dashboard.
 - The detail screen displays the task's title, description, reminder, and (if it has children) its direct-children subtask progress — all read-only.
-- The detail screen lists the task's direct subtasks read-only; tapping a subtask opens that subtask's detail view.
+- The detail screen lists the task's direct subtasks, each with a completion control (applying the same completion invariant/cascade as the rest of the app); tapping a subtask outside that control opens its own detail view.
 - The detail screen exposes an **"Editar"** affordance that navigates to the existing edit screen.
 - The existing per-row "Editar"/"Eliminar" buttons on the dashboard card remain unchanged; this change adds tapping the card body as the gesture that opens read mode.
 - No domain-model change, no new native module, no new dependency.

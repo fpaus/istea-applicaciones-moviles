@@ -41,7 +41,7 @@ point downward only.
 ```
 UI  (app/* — Expo Router screens & layouts)
   │
-hooks  (view-model: useDashboard, useAddTaskForm, useProjectSelector, useNotificationPermission;
+hooks  (view-model: useDashboard, useAddTaskForm, useEditTaskForm, useTaskDetail, useProjectSelector, useNotificationPermission;
         data/actions: useProject, useActiveTasks, useCompletedTasks, useTaskActions, useTaskCompletion;
         app-wiring: useNotificationBridge, useHydrated)  ← components consume only these
   │
@@ -143,8 +143,9 @@ Written by each store's `persist` middleware (JSON-serialized store state):
 - Session restored on launch by the project store's `persist` rehydration.
 
 ### Tasks
-- **Create** (`add.tsx`): title, optional description, and an optional reminder toggle ("Agregar recordatorio"). When toggled, time (hour 0–23 / minute 0–59 via `NumberInput`) and a **"Repeat Daily"** switch are configured. Save is disabled until title is provided (and time when reminder is toggled on).
-- **Edit / Detail / Subtree** (`edit.tsx`): edit title, description, and reminder. It also displays a recursive subtree of its subtasks, allows adding subtasks inline under this task, and displays direct-children progress indicators.
+- **Create** (`add.tsx`): title, optional description, and an optional reminder toggle ("Agregar recordatorio"). When toggled, time (hour 0–23 / minute 0–59 via `NumberInput`) and a **"Repeat Daily"** switch are configured. Save is disabled until title is provided (and time when reminder is toggled on). The form (like `edit.tsx`) is wrapped in a `KeyboardAvoidingView` with a header-aware offset (`useHeaderHeight`) and `keyboardShouldPersistTaps="handled"` so focused fields are not hidden behind the on-screen keyboard.
+- **Detail view** (`detail.tsx`, view-model `useTaskDetail`): tapping a task's card body on the dashboard opens a detail view showing its title, description, status, reminder, and direct-children progress, plus a list of its direct subtasks. The task itself is shown read-only (an "Editar" button navigates to the edit screen), but each listed subtask has a completion toggle (wired to `useTaskCompletion`, so it applies the same cascade/invariant) and is tappable elsewhere to open its own detail. Renders "Tarea no encontrada" if the task id no longer exists. The dashboard card's per-row "Editar"/"Eliminar" buttons remain separate touch targets and do not open the detail.
+- **Edit / Subtree** (`edit.tsx`): edit title, description, and reminder. It also displays a recursive subtree of its subtasks, allows adding subtasks inline under this task, and displays direct-children progress indicators.
 - **List / dashboard** (`(app)/index.tsx`): `SectionList` split into
   **Active Tasks** (not completed, sorted by next upcoming time-of-day for timed tasks, followed by reminder-less tasks ordered by `createdAt`) and
   **Completed**. Shows **root tasks only** (no `parentId`); each root with children renders a direct-children completion progress indicator.
@@ -195,7 +196,8 @@ app/_layout.tsx          hydration gate (useHydrated) + useNotificationBridge �
   (app)/_layout.tsx      Stack (header hidden if no active project); dashboard header hosts HeaderProjectSwitcher
     index.tsx            dashboard (Active / Completed) + FAB; renders ProjectSelector inline if no active project
     add.tsx              create task (pushed screen with back affordance, no switcher)
-    edit.tsx             edit task (pushed screen with back affordance)
+    detail.tsx           read-only task detail (pushed screen); tapping a task card opens it; offers "Editar" → edit
+    edit.tsx             edit task + subtree management (pushed screen with back affordance)
 ```
 
 

@@ -14,7 +14,7 @@ later attribute changes (image/location/responsible/calendar) will render into.
 - An "Editar" affordance to jump into the existing edit flow.
 
 **Non-Goals**
-- No editing, completing, or deleting from the detail screen (those stay on the dashboard / edit).
+- No editing, completing, or deleting of the task **itself** from the detail screen (those stay on the dashboard / edit). Listed subtasks, however, expose a completion control.
 - No domain-model change. No new native module (this is pure navigation/UI).
 - Not removing or altering the existing edit screen's subtree-management behavior.
 
@@ -41,11 +41,13 @@ from the task store, derives its direct subtasks and direct-children progress
 exactly as today (backward compatible — used by `edit.tsx`'s subtree rendering
 which should not navigate away unexpectedly).
 
-### Read-only rendering
-Reuse the existing reminder-formatting and progress-bar presentation already in
-`CardItem` so the detail view is visually consistent. Subtasks are listed
-read-only and are themselves tappable (→ their own detail). The detail view
-renders only the attributes that exist today; later changes extend it.
+### Read-only task, actionable subtasks
+The task's own attributes (title/description/reminder/progress) render read-only,
+reusing the existing reminder-formatting and progress-bar presentation from
+`CardItem` for visual consistency. Each listed subtask carries a completion
+control (wired to `useTaskCompletion`, applying the same invariant/cascade) and is
+otherwise tappable to open its own detail. The detail view renders only the
+attributes that exist today; later changes extend it.
 
 ### Missing task guard
 If the task id is not found (e.g. deleted while navigating), the screen shows a
