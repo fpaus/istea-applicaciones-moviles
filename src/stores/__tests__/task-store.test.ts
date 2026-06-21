@@ -743,4 +743,94 @@ describe("task store", () => {
       errorSpy.mockRestore();
     });
   });
+
+  describe("image attachment (imageUri)", () => {
+    it("addTask persists the imageUri from the input", async () => {
+      const notifications = makeFakeNotifications();
+      const store = makeStore(notifications);
+
+      await store.getState().addTask("project-1", "Work", {
+        title: "With photo",
+        description: "",
+        notification: null,
+        imageUri: "file:///photo.jpg",
+      });
+
+      expect(store.getState().tasks["project-1"][0].imageUri).toBe(
+        "file:///photo.jpg",
+      );
+    });
+
+    it("addTask defaults imageUri to null when absent", async () => {
+      const notifications = makeFakeNotifications();
+      const store = makeStore(notifications);
+
+      await store.getState().addTask("project-1", "Work", {
+        title: "No photo",
+        description: "",
+        notification: null,
+      });
+
+      expect(store.getState().tasks["project-1"][0].imageUri).toBeNull();
+    });
+
+    it("updateTask replaces the imageUri with a new value", async () => {
+      const notifications = makeFakeNotifications();
+      const store = makeStore(notifications);
+
+      await store.getState().addTask("project-1", "Work", {
+        title: "Photo",
+        description: "",
+        notification: null,
+        imageUri: "file:///old.jpg",
+      });
+      const id = store.getState().tasks["project-1"][0].id;
+
+      await store.getState().updateTask("project-1", id, {
+        imageUri: "file:///new.jpg",
+      });
+
+      expect(store.getState().tasks["project-1"][0].imageUri).toBe(
+        "file:///new.jpg",
+      );
+    });
+
+    it("updateTask can clear the imageUri to null", async () => {
+      const notifications = makeFakeNotifications();
+      const store = makeStore(notifications);
+
+      await store.getState().addTask("project-1", "Work", {
+        title: "Photo",
+        description: "",
+        notification: null,
+        imageUri: "file:///old.jpg",
+      });
+      const id = store.getState().tasks["project-1"][0].id;
+
+      await store.getState().updateTask("project-1", id, {
+        imageUri: null,
+      });
+
+      expect(store.getState().tasks["project-1"][0].imageUri).toBeNull();
+    });
+
+    it("updateTask leaves imageUri unchanged when the patch omits it", async () => {
+      const notifications = makeFakeNotifications();
+      const store = makeStore(notifications);
+
+      await store.getState().addTask("project-1", "Work", {
+        title: "Photo",
+        description: "",
+        notification: null,
+        imageUri: "file:///keep.jpg",
+      });
+      const id = store.getState().tasks["project-1"][0].id;
+
+      await store.getState().updateTask("project-1", id, { title: "Renamed" });
+
+      const task = store.getState().tasks["project-1"][0];
+      expect(task.title).toBe("Renamed");
+      expect(task.imageUri).toBe("file:///keep.jpg");
+    });
+  });
 });

@@ -10,6 +10,7 @@ import { useTaskActions } from "@/src/hooks/useTaskActions";
 import { useTaskCompletion } from "@/src/hooks/useTaskCompletion";
 import { useTaskStore } from "@/src/stores/task-store";
 import { Task } from "@/src/types";
+import { Image } from "expo-image";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useCallback, useRef, useState } from "react";
 import {
@@ -101,6 +102,9 @@ export default function EditScreen(): React.JSX.Element {
     setMinute,
     repeats,
     setRepeats,
+    imageUri,
+    pickImage,
+    removeImage,
     isFormValid,
     handleSave,
   } = useEditTaskForm(projectId, taskId);
@@ -225,6 +229,29 @@ export default function EditScreen(): React.JSX.Element {
           </View>
         </>
       )}
+
+      <View style={styles.imageSection}>
+        <Button
+          title={imageUri ? "Cambiar imagen" : "Agregar imagen"}
+          variant="outline"
+          onPress={pickImage}
+        />
+        {imageUri && (
+          <>
+            <Image
+              source={{ uri: imageUri }}
+              style={styles.imagePreview}
+              contentFit="cover"
+            />
+            <Button
+              title="Quitar imagen"
+              variant="outline"
+              onPress={removeImage}
+              style={styles.removeImageBtn}
+            />
+          </>
+        )}
+      </View>
 
       <Button
         title="Guardar Cambios"
@@ -362,6 +389,19 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "center",
     marginTop: Utility.spacing.m,
+  },
+  imageSection: {
+    marginTop: Utility.spacing.l,
+  },
+  imagePreview: {
+    width: "100%",
+    height: 200,
+    borderRadius: 8,
+    marginTop: Utility.spacing.m,
+    backgroundColor: "#E2E8F0",
+  },
+  removeImageBtn: {
+    marginTop: Utility.spacing.s,
   },
   currentTaskProgress: {
     marginTop: Utility.spacing.m,

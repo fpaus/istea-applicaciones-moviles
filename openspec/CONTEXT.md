@@ -26,6 +26,7 @@ There is **no remote server or API**. All state lives on the device via
 | Routing | `expo-router` ~6 (file-based, route groups) |
 | Navigation UI | `expo-router` native stack with a custom header |
 | Notifications | `expo-notifications` (local scheduling + permissions) |
+| Images | `expo-image-picker` (gallery selection) + `expo-image` (display) |
 | Persistence | `@react-native-async-storage/async-storage` |
 | Tooling | ESLint (`eslint-config-expo`), Prettier |
 
@@ -50,6 +51,7 @@ stores  (Zustand: useProjectStore, useTaskStore)
   │   task actions ─► NotificationService (injected dependency)
   │
 services  (NotificationService — OS side-effects only) ─► expo-notifications
+          (ImagePickerService — gallery selection + permission) ─► expo-image-picker
   │
 utils  (src/utils/uuid.ts, src/utils/tasks-cascade.ts — generateUUID, cascade helpers)
   │
@@ -118,10 +120,11 @@ interface Task {
   completed: boolean;
   createdAt: number;          // epoch ms
   parentId?: string | null;   // parent task ID (null/absent for root tasks)
+  imageUri?: string | null;   // local device URI for a single attached image (null/absent = none)
 }
 ```
 
-`NewTask` (input to create) = `{ title, description, notification? }`.
+`NewTask` (input to create) = `{ title, description, notification?, parentId?, imageUri? }`.
 
 ### AsyncStorage keys
 
@@ -153,6 +156,12 @@ Written by each store's `persist` middleware (JSON-serialized store state):
 - **Re-open** (`reopenTask`): cascades up to re-open all parent/ancestor tasks to preserve the completion invariant. Reschedules reminders for re-opened tasks (repeats always; future one-shot only; past one-shot skipped). Adding an incomplete child task to a completed parent automatically triggers this ancestor re-open.
 - **Delete**: cascade deletes the task and all of its descendants, cancelling all of their scheduled notifications.
 - **Clear all** (`clearAll`): wipes all tasks inside the active project and cancels their notifications.
+- **Image attachment** (`imageUri`): a task can carry one optional image selected from the device **gallery** (no camera). Added/changed/removed in both `add.tsx` and `edit.tsx` ("Agregar/Cambiar imagen" → preview → "Quitar imagen"); the form hooks delegate to `ImagePickerService`. Displayed (via `expo-image`) full-width on the detail view and as a 40×40 thumbnail on the dashboard `CardItem` (layout unchanged when absent). The URI is local to the device — there is no upload.
+
+### Images (local)
+- **Gallery only, native** (`ImagePickerService`): `requestPermission()` (photo-library) and `pickFromLibrary()` wrap `expo-image-picker`. There is intentionally no camera method.
+- **Resilient**: every method is wrapped in try/catch and returns `null` (or `false`) rather than throwing, so a denied permission or a cancelled/failed pick never blocks saving the task — it simply saves with no image (mirrors the notification-rejection fallback).
+- **Native-only, no web guard**: unlike `NotificationService`, the service does not guard `Platform.OS !== "web"`; image features are out of scope on web.
 
 ### Notifications (local)
 - Permission requested on demand; Android uses a `"tasks"` channel
@@ -221,6 +230,7 @@ touches the affected area:
 - **No seeded data.** The app starts empty; first use requires creating a project.
 - **No project archiving.** Projects can be renamed and deleted (delete cascades to their tasks + notifications), but there is no archiving, color/metadata, reordering, bulk delete, or undo.
 - **No task undo flow.** Once a task is completed or deleted, its scheduled OS notification is immediately canceled, and there is no "undo" recovery flow.
+- **Image attachments are local URIs.** A task's `imageUri` is a device-local file URI — there is no upload/cloud copy, no in-app cropping/filters, no multiple images, and no camera capture (gallery only). The URI can become **stale** if the OS clears its cached picker files; a missing image degrades gracefully to no image (the surfaces render nothing).
 
 ## 7. Planned / future features (intended direction)
 

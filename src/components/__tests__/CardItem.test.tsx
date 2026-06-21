@@ -68,3 +68,22 @@ describe("CardItem onOpen", () => {
     expect(getByText("Comprar pan")).toBeTruthy();
   });
 });
+
+describe("CardItem image thumbnail", () => {
+  it("renders a thumbnail when the task has an imageUri", () => {
+    const withImage: Task = { ...task, imageUri: "file:///photo.jpg" };
+    const { getByTestId } = render(
+      <CardItem item={withImage} onMarkCompleted={noop} onDelete={noop} />,
+    );
+
+    expect(getByTestId("task-thumbnail-t1")).toBeTruthy();
+  });
+
+  it("renders no thumbnail when the task has no image", () => {
+    const { queryByTestId } = render(
+      <CardItem item={task} onMarkCompleted={noop} onDelete={noop} />,
+    );
+
+    expect(queryByTestId("task-thumbnail-t1")).toBeNull();
+  });
+});

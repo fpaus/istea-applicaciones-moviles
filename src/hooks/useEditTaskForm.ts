@@ -2,6 +2,7 @@ import { useRouter } from "expo-router";
 import { useCallback, useState } from "react";
 import { useTaskStore } from "../stores/task-store";
 import { useProjectStore } from "../stores/project-store";
+import { imagePickerService } from "../services/image-picker";
 import { Task } from "../types";
 
 const EMPTY_ARRAY: Task[] = [];
@@ -19,6 +20,9 @@ export interface UseEditTaskFormResult {
   setMinute: (minute: number | null) => void;
   repeats: boolean;
   setRepeats: (repeats: boolean) => void;
+  imageUri: string | null;
+  pickImage: () => Promise<void>;
+  removeImage: () => void;
   isFormValid: boolean;
   handleSave: () => Promise<void>;
 }
@@ -49,10 +53,22 @@ export function useEditTaskForm(
   const [repeats, setRepeats] = useState(
     oldTask?.notification?.repeats ?? false,
   );
+  const [imageUri, setImageUri] = useState<string | null>(
+    oldTask?.imageUri ?? null,
+  );
 
   const isFormValid =
     title.trim() !== "" &&
     (!hasReminder || (hour !== null && minute !== null));
+
+  // Resilient gallery pick: a cancel/denial (null) leaves the existing image
+  // untouched, so editing never loses the current attachment.
+  const pickImage = useCallback(async () => {
+    const uri = await imagePickerService.pickFromLibrary();
+    if (uri) setImageUri(uri);
+  }, []);
+
+  const removeImage = useCallback(() => setImageUri(null), []);
 
   const handleSave = useCallback(async () => {
     if (!oldTask) return;
@@ -62,6 +78,11 @@ export function useEditTaskForm(
     const patch: Partial<Omit<Task, "id" | "completed" | "createdAt">> = {};
     if (title !== oldTask.title) patch.title = title;
     if (description !== oldTask.description) patch.description = description;
+    // Only patch imageUri when it actually changed; `null` is an explicit clear
+    // the store distinguishes from "unchanged" (undefined).
+    if ((imageUri ?? null) !== (oldTask.imageUri ?? null)) {
+      patch.imageUri = imageUri;
+    }
 
     if (!hasReminder) {
       if (oldTask.notification) {
@@ -108,6 +129,7 @@ export function useEditTaskForm(
     hour,
     minute,
     repeats,
+    imageUri,
     oldTask,
     projectName,
   ]);
@@ -125,6 +147,9 @@ export function useEditTaskForm(
     setMinute,
     repeats,
     setRepeats,
+    imageUri,
+    pickImage,
+    removeImage,
     isFormValid,
     handleSave,
   };

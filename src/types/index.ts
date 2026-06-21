@@ -13,6 +13,8 @@ export interface NewTask {
   description: string;
   notification?: { time: Time; repeats: boolean; notificationId: string | null } | null;
   parentId?: string | null;
+  /** Local device URI for a single attached image. Null/absent means no image. */
+  imageUri?: string | null;
 }
 
 export interface Task {
@@ -23,4 +25,6 @@ export interface Task {
   completed: boolean;
   createdAt: number;
   parentId?: string | null;
+  /** Local device URI for a single attached image. Null/absent means no image. */
+  imageUri?: string | null;
 }

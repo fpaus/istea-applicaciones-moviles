@@ -2,13 +2,20 @@ import { act, renderHook } from "@testing-library/react-native";
 import { useAddTaskForm } from "../useAddTaskForm";
 import { useProjectStore } from "../../stores/project-store";
 import { useTaskStore } from "../../stores/task-store";
+import { imagePickerService } from "../../services/image-picker";
 
 const mockBack = jest.fn();
 jest.mock("expo-router", () => ({ useRouter: () => ({ back: mockBack }) }));
+jest.mock("../../services/image-picker", () => ({
+  imagePickerService: { pickFromLibrary: jest.fn() },
+}));
+
+const mockPick = imagePickerService.pickFromLibrary as jest.Mock;
 
 describe("useAddTaskForm", () => {
   beforeEach(() => {
     mockBack.mockClear();
+    mockPick.mockReset();
     useProjectStore.setState({
       currentProject: { id: "p1", name: "Work" },
       projects: [{ id: "p1", name: "Work" }],
@@ -110,5 +117,66 @@ describe("useAddTaskForm", () => {
 
     expect(useTaskStore.getState().tasks["p1"]).toBeUndefined();
     expect(mockBack).not.toHaveBeenCalled();
+  });
+
+  describe("image attachment", () => {
+    it("pickImage sets imageUri from the service and save includes it", async () => {
+      mockPick.mockResolvedValue("file:///gallery/photo.jpg");
+      const { result } = renderHook(() => useAddTaskForm());
+
+      act(() => {
+        result.current.setTitle("Has photo");
+      });
+
+      await act(async () => {
+        await result.current.pickImage();
+      });
+      expect(result.current.imageUri).toBe("file:///gallery/photo.jpg");
+
+      await act(async () => {
+        await result.current.handleSave();
+      });
+
+      const tasks = useTaskStore.getState().tasks["p1"];
+      expect(tasks[0].imageUri).toBe("file:///gallery/photo.jpg");
+    });
+
+    it("leaves imageUri unchanged when the picker is cancelled/denied, and still saves", async () => {
+      mockPick.mockResolvedValue(null);
+      const { result } = renderHook(() => useAddTaskForm());
+
+      act(() => {
+        result.current.setTitle("No photo");
+      });
+
+      await act(async () => {
+        await result.current.pickImage();
+      });
+      expect(result.current.imageUri).toBeNull();
+
+      await act(async () => {
+        await result.current.handleSave();
+      });
+
+      const tasks = useTaskStore.getState().tasks["p1"];
+      expect(tasks).toHaveLength(1);
+      expect(tasks[0].imageUri).toBeNull();
+      expect(mockBack).toHaveBeenCalledTimes(1);
+    });
+
+    it("removeImage clears a previously picked image", async () => {
+      mockPick.mockResolvedValue("file:///gallery/photo.jpg");
+      const { result } = renderHook(() => useAddTaskForm());
+
+      await act(async () => {
+        await result.current.pickImage();
+      });
+      expect(result.current.imageUri).toBe("file:///gallery/photo.jpg");
+
+      act(() => {
+        result.current.removeImage();
+      });
+      expect(result.current.imageUri).toBeNull();
+    });
   });
 });

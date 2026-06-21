@@ -5,6 +5,7 @@ import { Colors, Utility } from "@/src/constants/theme";
 import { useTaskCompletion } from "@/src/hooks/useTaskCompletion";
 import { useTaskDetail } from "@/src/hooks/useTaskDetail";
 import { Task } from "@/src/types";
+import { Image } from "expo-image";
 import { useLocalSearchParams } from "expo-router";
 import React from "react";
 import { Pressable, ScrollView, StyleSheet, Switch, View } from "react-native";
@@ -47,6 +48,14 @@ export default function DetailScreen(): React.JSX.Element {
         <Typography variant="body" style={styles.description}>
           {task.description}
         </Typography>
+      )}
+
+      {task.imageUri && (
+        <Image
+          source={{ uri: task.imageUri }}
+          style={styles.image}
+          contentFit="cover"
+        />
       )}
 
       <Card style={styles.metaCard}>
@@ -130,6 +139,13 @@ const styles = StyleSheet.create({
   },
   description: {
     marginBottom: Utility.spacing.m,
+  },
+  image: {
+    width: "100%",
+    height: 220,
+    borderRadius: 8,
+    marginBottom: Utility.spacing.m,
+    backgroundColor: "#E2E8F0",
   },
   metaCard: {
     marginBottom: Utility.spacing.m,

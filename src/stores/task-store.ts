@@ -175,6 +175,7 @@ export const createTaskState =
         completed: false,
         createdAt: Date.now(),
         parentId: data.parentId ?? null,
+        imageUri: data.imageUri ?? null,
       };
 
       const projectTasks = get().tasks[projectId] || [];
@@ -329,11 +330,17 @@ export const createTaskState =
         }
       }
 
+      // `imageUri` is an explicit clear vs. unchanged distinction: `undefined`
+      // means "leave as-is", `null` means "remove the image".
+      const nextImageUri =
+        patch.imageUri !== undefined ? patch.imageUri : oldTask.imageUri;
+
       const updatedTask: Task = {
         ...oldTask,
         title: nextTitle,
         description: nextDescription,
         notification: nextNotification,
+        imageUri: nextImageUri,
       };
 
       const nextTasks = [...projectTasks];

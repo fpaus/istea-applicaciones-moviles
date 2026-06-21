@@ -2,13 +2,20 @@ import { act, renderHook } from "@testing-library/react-native";
 import { useProjectStore } from "../../stores/project-store";
 import { useTaskStore } from "../../stores/task-store";
 import { useEditTaskForm } from "../useEditTaskForm";
+import { imagePickerService } from "../../services/image-picker";
 
 const mockBack = jest.fn();
 jest.mock("expo-router", () => ({ useRouter: () => ({ back: mockBack }) }));
+jest.mock("../../services/image-picker", () => ({
+  imagePickerService: { pickFromLibrary: jest.fn() },
+}));
+
+const mockPick = imagePickerService.pickFromLibrary as jest.Mock;
 
 describe("useEditTaskForm", () => {
   beforeEach(() => {
     mockBack.mockClear();
+    mockPick.mockReset();
     useProjectStore.setState({
       currentProject: { id: "p1", name: "Work" },
       projects: [{ id: "p1", name: "Work" }],
@@ -265,5 +272,96 @@ describe("useEditTaskForm", () => {
     );
     expect(mockBack).toHaveBeenCalledTimes(1);
     updateTaskSpy.mockRestore();
+  });
+
+  describe("image attachment", () => {
+    beforeEach(() => {
+      useTaskStore.setState({
+        tasks: {
+          p1: [
+            {
+              id: "t1",
+              title: "Task 1",
+              description: "Old description",
+              notification: null,
+              completed: false,
+              createdAt: 100,
+              imageUri: "file:///existing.jpg",
+            },
+          ],
+        },
+        hasHydrated: true,
+      });
+    });
+
+    it("pre-fills imageUri from the existing task", () => {
+      const { result } = renderHook(() => useEditTaskForm("p1", "t1"));
+      expect(result.current.imageUri).toBe("file:///existing.jpg");
+    });
+
+    it("pickImage replaces the image and save patches the new imageUri", async () => {
+      mockPick.mockResolvedValue("file:///new.jpg");
+      const updateTaskSpy = jest.spyOn(useTaskStore.getState(), "updateTask");
+      const { result } = renderHook(() => useEditTaskForm("p1", "t1"));
+
+      await act(async () => {
+        await result.current.pickImage();
+      });
+      expect(result.current.imageUri).toBe("file:///new.jpg");
+
+      await act(async () => {
+        await result.current.handleSave();
+      });
+
+      expect(updateTaskSpy).toHaveBeenCalledWith(
+        "p1",
+        "t1",
+        { imageUri: "file:///new.jpg" },
+        "Work",
+      );
+      updateTaskSpy.mockRestore();
+    });
+
+    it("removeImage clears the image and save patches imageUri: null", async () => {
+      const updateTaskSpy = jest.spyOn(useTaskStore.getState(), "updateTask");
+      const { result } = renderHook(() => useEditTaskForm("p1", "t1"));
+
+      act(() => {
+        result.current.removeImage();
+      });
+      expect(result.current.imageUri).toBeNull();
+
+      await act(async () => {
+        await result.current.handleSave();
+      });
+
+      expect(updateTaskSpy).toHaveBeenCalledWith(
+        "p1",
+        "t1",
+        { imageUri: null },
+        "Work",
+      );
+      updateTaskSpy.mockRestore();
+    });
+
+    it("cancel/denial leaves the existing image unchanged and does not patch it", async () => {
+      mockPick.mockResolvedValue(null);
+      const updateTaskSpy = jest.spyOn(useTaskStore.getState(), "updateTask");
+      const { result } = renderHook(() => useEditTaskForm("p1", "t1"));
+
+      await act(async () => {
+        await result.current.pickImage();
+      });
+      expect(result.current.imageUri).toBe("file:///existing.jpg");
+
+      await act(async () => {
+        await result.current.handleSave();
+      });
+
+      // Nothing changed at all → updateTask not called.
+      expect(updateTaskSpy).not.toHaveBeenCalled();
+      expect(mockBack).toHaveBeenCalledTimes(1);
+      updateTaskSpy.mockRestore();
+    });
   });
 });

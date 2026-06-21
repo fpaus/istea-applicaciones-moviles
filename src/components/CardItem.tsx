@@ -1,5 +1,6 @@
 import React from "react";
 import { View, Switch, StyleSheet, Pressable } from "react-native";
+import { Image } from "expo-image";
 import { Card } from "@/src/components/ui/Card";
 import { Typography } from "@/src/components/ui/Typography";
 import { Button } from "@/src/components/ui/Button";
@@ -29,6 +30,14 @@ export function CardItem({
   const body = (
     <>
       <View style={styles.cardHeader}>
+        {item.imageUri && (
+          <Image
+            testID={`task-thumbnail-${item.id}`}
+            source={{ uri: item.imageUri }}
+            style={styles.thumbnail}
+            contentFit="cover"
+          />
+        )}
         <Typography variant="h3" style={styles.titleText}>
           {item.title}
         </Typography>
@@ -111,6 +120,13 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "center",
     marginBottom: Utility.spacing.xs,
+  },
+  thumbnail: {
+    width: 40,
+    height: 40,
+    borderRadius: 6,
+    marginRight: Utility.spacing.s,
+    backgroundColor: "#E2E8F0",
   },
   titleText: {
     flex: 1,

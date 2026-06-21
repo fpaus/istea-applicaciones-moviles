@@ -5,6 +5,7 @@ import { NumberInput } from "@/src/components/ui/NumberInput";
 import { Typography } from "@/src/components/ui/Typography";
 import { Colors, Utility } from "@/src/constants/theme";
 import { useAddTaskForm } from "@/src/hooks/useAddTaskForm";
+import { Image } from "expo-image";
 import {
   ScrollView,
   StyleSheet,
@@ -26,6 +27,9 @@ export default function AddScreen() {
     setMinute,
     repeats,
     setRepeats,
+    imageUri,
+    pickImage,
+    removeImage,
     isFormValid,
     handleSave,
   } = useAddTaskForm();
@@ -98,6 +102,29 @@ export default function AddScreen() {
         </>
       )}
 
+      <View style={styles.imageSection}>
+        <Button
+          title={imageUri ? "Cambiar imagen" : "Agregar imagen"}
+          variant="outline"
+          onPress={pickImage}
+        />
+        {imageUri && (
+          <>
+            <Image
+              source={{ uri: imageUri }}
+              style={styles.imagePreview}
+              contentFit="cover"
+            />
+            <Button
+              title="Quitar imagen"
+              variant="outline"
+              onPress={removeImage}
+              style={styles.removeImageBtn}
+            />
+          </>
+        )}
+      </View>
+
       <Button
         title="Guardar Tarea"
         onPress={handleSave}
@@ -141,5 +168,18 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "center",
     marginTop: Utility.spacing.m,
+  },
+  imageSection: {
+    marginTop: Utility.spacing.l,
+  },
+  imagePreview: {
+    width: "100%",
+    height: 200,
+    borderRadius: 8,
+    marginTop: Utility.spacing.m,
+    backgroundColor: "#E2E8F0",
+  },
+  removeImageBtn: {
+    marginTop: Utility.spacing.s,
   },
 });

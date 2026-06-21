@@ -21,3 +21,16 @@ jest.mock("expo-notifications", () => ({
 }));
 
 jest.mock("expo-device", () => ({ isDevice: true }));
+
+// Mock expo-image-picker so tests are hermetic (no native module). The
+// ImagePickerService is exercised against these jest.fn()s; forms inject a fake.
+jest.mock("expo-image-picker", () => ({
+  requestMediaLibraryPermissionsAsync: jest.fn(async () => ({
+    status: "granted",
+    granted: true,
+  })),
+  launchImageLibraryAsync: jest.fn(async () => ({
+    canceled: false,
+    assets: [{ uri: "file:///mock/picked-image.jpg" }],
+  })),
+}));
