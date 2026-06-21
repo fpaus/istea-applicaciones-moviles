@@ -1,6 +1,7 @@
 import * as Device from "expo-device";
 import type * as NotificationsType from "expo-notifications";
 import { Platform } from "react-native";
+import { Colors } from "../constants/theme";
 import { Time } from "../types";
 
 let Notifications: typeof NotificationsType | null = null;
@@ -27,7 +28,10 @@ if (Notifications) {
       }),
     });
   } catch (error) {
-    console.error("[NotificationService] Failed to set notification handler:", error);
+    console.error(
+      "[NotificationService] Failed to set notification handler:",
+      error,
+    );
   }
 }
 
@@ -49,7 +53,7 @@ export class NotificationService {
           name: "Tasks",
           importance: Notifications.AndroidImportance.HIGH,
           vibrationPattern: [0, 250, 250, 250],
-          lightColor: "#6C63FF",
+          lightColor: Colors.light.primary,
           sound: "default",
         });
       } catch (error) {
@@ -87,10 +91,7 @@ export class NotificationService {
       const { status } = await Notifications.getPermissionsAsync();
       return status === "granted";
     } catch (error) {
-      console.error(
-        "[NotificationService] Failed to check permission:",
-        error,
-      );
+      console.error("[NotificationService] Failed to check permission:", error);
       return false;
     }
   }
