@@ -34,3 +34,43 @@ jest.mock("expo-image-picker", () => ({
     assets: [{ uri: "file:///mock/picked-image.jpg" }],
   })),
 }));
+
+jest.mock("expo-calendar", () => ({
+  requestCalendarPermissionsAsync: jest.fn(async () => ({
+    status: "granted",
+  })),
+  getCalendarPermissionsAsync: jest.fn(async () => ({
+    status: "granted",
+  })),
+  getCalendarsAsync: jest.fn(async () => [
+    {
+      id: "cal-1",
+      title: "Default",
+      allowsModifications: true,
+      source: { name: "Local", type: "local", isLocalAccount: true },
+    },
+  ]),
+  createCalendarAsync: jest.fn(async () => "cal-new"),
+  createEventAsync: jest.fn(async () => "event-1"),
+  updateEventAsync: jest.fn(async () => "event-1"),
+  deleteEventAsync: jest.fn(async () => {}),
+  createAttendeeAsync: jest.fn(async () => "attendee-1"),
+  EntityTypes: { EVENT: "event", REMINDER: "reminder" },
+  Frequency: { DAILY: "daily", WEEKLY: "weekly", MONTHLY: "monthly", YEARLY: "yearly" },
+  AttendeeRole: {
+    UNKNOWN: "unknown",
+    REQUIRED: "required",
+    OPTIONAL: "optional",
+    ATTENDEE: "attendee",
+  },
+  AttendeeStatus: {
+    INVITED: "invited",
+    ACCEPTED: "accepted",
+    PENDING: "pending",
+  },
+  AttendeeType: {
+    UNKNOWN: "unknown",
+    PERSON: "person",
+    REQUIRED: "required",
+  },
+}));

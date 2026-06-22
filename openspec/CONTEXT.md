@@ -28,6 +28,7 @@ There is **no remote server or API**. All state lives on the device via
 | Notifications | `expo-notifications` (local scheduling + permissions) |
 | Images | `expo-image-picker` (gallery selection) + `expo-image` (display) |
 | Contacts | `expo-contacts` (native device contact picker) |
+| Calendar | `expo-calendar` (native calendar event sync) |
 | Persistence | `@react-native-async-storage/async-storage` |
 | Tooling | ESLint (`eslint-config-expo`), Prettier |
 
@@ -54,6 +55,7 @@ stores  (Zustand: useProjectStore, useTaskStore)
 services | (NotificationService — OS side-effects only) ─► expo-notifications
           (ImagePickerService — gallery selection + permission) ─► expo-image-picker
           (ContactsService — contact selection + permission) ─► expo-contacts
+          (CalendarService — native calendar event sync) ─► expo-calendar
   │
 utils  (src/utils/uuid.ts, src/utils/tasks-cascade.ts — generateUUID, cascade helpers)
   │
@@ -134,10 +136,13 @@ interface Task {
     phone?: string;
     email?: string;
   } | null;
+  calendar?: {                // native calendar event sync status (null/absent = none)
+    eventId: string | null;   // scheduled OS calendar event id (null once completed/deleted)
+  } | null;
 }
 ```
 
-`NewTask` (input to create) = `{ title, description, notification?, parentId?, imageUri?, location?, responsible? }`.
+`NewTask` (input to create) = `{ title, description, notification?, parentId?, imageUri?, location?, responsible?, calendar? }`.
 
 ### AsyncStorage keys
 
@@ -190,6 +195,18 @@ Written by each store's `persist` middleware (JSON-serialized store state):
 - **Snapshot Storage**: stores a flat copy (name, optional contact ID, optional phone number, and optional email) on the task instead of a live reference. This makes the task resilient if the underlying contact is modified or deleted in the system address book.
 - **Form Integration**: `useAddTaskForm` and `useEditTaskForm` hooks hold the responsible state, allowing picking, displaying, and clearing the responsible contact in both screens.
 - **Display**: read-only contact name, phone, and email details displayed on the detail view (`detail.tsx`) if present, and a simple indicator (👤 + name) on the dashboard `CardItem`.
+
+### Calendar Integration (local, native-only)
+- **Native Calendar Sync** (`CalendarService`): `requestPermission()` and `getWritableCalendarId()` wrap `expo-calendar`. Reuses a custom calendar named "Recurring Reminders" or a default calendar if writable.
+- **Resilient**: Every calendar call is wrapped in a try/catch (via `safeCalendarDelete` and other helpers) and swallows failures. A failing calendar sync never crashes store operations or blocks saving/completing tasks (degrades gracefully to no calendar event).
+- **Lockstep Reconciliation**: Calendar events are created/updated/deleted in lockstep with the notifications lifecycle:
+  - Task creation with a reminder & calendar toggled ON -> creates a calendar event.
+  - Task completion -> deletes the calendar event from the device (preference kept, so `calendar.eventId = null`).
+  - Task re-opening -> recreates the calendar event if the task has a future reminder.
+  - Task updates (title, notes/description, time, repeats) -> updates the calendar event. If reminder is removed, the calendar event is deleted.
+  - Task deletion / cascade deletion -> deletes all calendar events for the task and its descendants.
+- **Attendee Invitations**: If the task has a responsible contact assigned with a valid email address, they are automatically invited as a required attendee to the calendar event. This uses `Calendar.createAttendeeAsync` on Android and degrades gracefully on iOS (swallowing programmatically uninvited attendee errors).
+- **Form & View Integration**: `useAddTaskForm` and `useEditTaskForm` hooks capture the calendar toggle state, which is displayed using switches on both screens. A visual calendar indicator (📅 + "Sincronizado con el calendario") is shown on the dashboard `CardItem` and detail view (`detail.tsx`).
 
 ### Notifications (local)
 - Permission requested on demand; Android uses a `"tasks"` channel
@@ -288,4 +305,5 @@ The following architectural and design decisions were made during the refactorin
 - **Resilient Multi-Task Cascades**: Invariants of completion and deletion are calculated cleanly in pure transforms, and their associated OS notifications are reconciled in bulk inline with robust failure containment (failures in scheduling/cancelling one task do not abort the overall mutation or corrupt state).
 - **Resilient Contacts Snapshot Pattern**: The `responsible` task property stores a copy of the selected contact's fields (`name`, `contactId`, `phone`, `email`) rather than querying the device's address book live. This guarantees task display resilience even if the underlying device contact is later altered or deleted.
 - **Graceful Fallbacks for Contact Picker**: If `Contacts.presentContactPickerAsync()` throws due to specific SDK limitations, `ContactsService` falls back to querying the contact list directly via `Contacts.getContactsAsync()`, maintaining picking capability on all devices.
+- **Resilient Calendar Sync Lockstep**: All store mutations that touch notification state also reconcile the corresponding calendar event. If calendar operations fail, they degrade gracefully by setting `calendar.eventId` to `null` while leaving the task state valid, similar to the notification scheduling fallback.
 

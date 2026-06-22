@@ -2,6 +2,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { StateCreator, StoreApi, UseBoundStore, create } from "zustand";
 import { createJSONStorage, devtools, persist, PersistOptions } from "zustand/middleware";
 import { notificationService } from "../services/notifications";
+import { calendarService } from "../services/calendar";
 import { Task } from "../types";
 import { TaskDeps, TaskState } from "./types";
 import { generateUUID } from "../utils/uuid";
@@ -61,12 +62,23 @@ export const createTaskState =
     // Resilience: cancelling an OS notification must never abort or partially
     // corrupt the data mutation that triggered it (mirrors `addTask`, which
     // swallows scheduling errors). A failed cancel is logged, not thrown.
-    const safeCancel = async (id: string | null) => {
+    const safeCancel = async (id: string | null): Promise<void> => {
       if (!id) return;
       try {
         await deps.notifications.cancelNotification(id);
       } catch (error) {
         console.error("[task-store] Failed to cancel notification:", error);
+      }
+    };
+
+    // Resilience: a failing calendar op must never abort or partially
+    // corrupt the data mutation — mirror safeCancel for calendar events.
+    const safeCalendarDelete = async (eventId: string | null): Promise<void> => {
+      if (!eventId || !deps.calendar) return;
+      try {
+        await deps.calendar.deleteEvent(eventId);
+      } catch (error) {
+        console.error("[task-store] Failed to delete calendar event:", error);
       }
     };
 
@@ -82,6 +94,7 @@ export const createTaskState =
       const affectedTasks = [target, ...ancList];
 
       const newNotifIds: Record<string, string | null> = {};
+      const newCalendarIds: Record<string, string | null> = {};
 
       for (const t of affectedTasks) {
         if (t.completed && t.notification) {
@@ -110,6 +123,26 @@ export const createTaskState =
               );
               newNotifIds[t.id] = null;
             }
+
+            // Calendar lockstep: recreate event if calendar preference is set.
+            if (t.calendar && deps.calendar) {
+              try {
+                const eventId = await deps.calendar.createEvent(
+                  t.title,
+                  t.description,
+                  t.notification.time,
+                  repeats,
+                  t.responsible,
+                );
+                newCalendarIds[t.id] = eventId;
+              } catch (error) {
+                console.error(
+                  "[task-store] Failed to recreate calendar event on reopen:",
+                  error,
+                );
+                newCalendarIds[t.id] = null;
+              }
+            }
           } else {
             newNotifIds[t.id] = null;
           }
@@ -119,15 +152,24 @@ export const createTaskState =
       const reopenedList = reopenTask(projectTasks, targetId);
 
       return reopenedList.map((t) => {
+        let updated = t;
         if (t.id in newNotifIds) {
-          return {
-            ...t,
-            notification: t.notification
-              ? { ...t.notification, notificationId: newNotifIds[t.id] }
+          updated = {
+            ...updated,
+            notification: updated.notification
+              ? { ...updated.notification, notificationId: newNotifIds[t.id] }
               : null,
           };
         }
-        return t;
+        if (t.id in newCalendarIds) {
+          updated = {
+            ...updated,
+            calendar: updated.calendar
+              ? { ...updated.calendar, eventId: newCalendarIds[t.id] }
+              : updated.calendar,
+          };
+        }
+        return updated;
       });
     };
 
@@ -161,6 +203,25 @@ export const createTaskState =
         }
       }
 
+      // Calendar lockstep: create an event if the user opted in.
+      let calendarEventId: string | null = null;
+      if (data.calendar && data.notification && deps.calendar) {
+        try {
+          calendarEventId = await deps.calendar.createEvent(
+            data.title,
+            data.description,
+            data.notification.time,
+            data.notification.repeats,
+            data.responsible,
+          );
+        } catch (error) {
+          console.error(
+            "[task-store] Failed to create calendar event:",
+            error,
+          );
+        }
+      }
+
       const newTask: Task = {
         id: generateUUID(),
         title: data.title,
@@ -178,6 +239,9 @@ export const createTaskState =
         imageUri: data.imageUri ?? null,
         location: data.location ?? null,
         responsible: data.responsible ?? null,
+        calendar: data.calendar
+          ? { eventId: calendarEventId }
+          : null,
       };
 
       const projectTasks = get().tasks[projectId] || [];
@@ -208,6 +272,7 @@ export const createTaskState =
 
       for (const t of itemsToDelete) {
         await safeCancel(t.notification?.notificationId ?? null);
+        await safeCalendarDelete(t.calendar?.eventId ?? null);
       }
 
       set({
@@ -347,6 +412,66 @@ export const createTaskState =
       const nextResponsible =
         patch.responsible !== undefined ? patch.responsible : oldTask.responsible;
 
+      // Calendar lockstep reconciliation during updateTask.
+      let nextCalendar = oldTask.calendar;
+      if (patch.calendar !== undefined) {
+        const oldCal = oldTask.calendar;
+        const newCal = patch.calendar;
+
+        if (!oldCal && newCal && nextNotification && deps.calendar) {
+          // Calendar toggled ON: create event.
+          let eventId: string | null = null;
+          try {
+            eventId = await deps.calendar.createEvent(
+              nextTitle,
+              nextDescription,
+              nextNotification.time,
+              nextNotification.repeats,
+              nextResponsible,
+            );
+          } catch (error) {
+            console.error("[task-store] Failed to create calendar event:", error);
+          }
+          nextCalendar = { eventId };
+        } else if (oldCal && !newCal) {
+          // Calendar toggled OFF: delete event.
+          await safeCalendarDelete(oldCal.eventId);
+          nextCalendar = null;
+        }
+      }
+
+      // If reminder was removed, also remove calendar event.
+      if (!nextNotification && oldTask.notification && nextCalendar) {
+        await safeCalendarDelete(nextCalendar.eventId);
+        nextCalendar = null;
+      }
+
+      // If notification changed and calendar is on, update the event.
+      if (
+        nextCalendar?.eventId &&
+        nextNotification &&
+        deps.calendar &&
+        patch.calendar === undefined // not already handled above
+      ) {
+        const notifChanged = patch.notification !== undefined;
+        const titleOrDescChanged =
+          nextTitle !== oldTask.title || nextDescription !== oldTask.description;
+        if (notifChanged || titleOrDescChanged) {
+          try {
+            await deps.calendar.updateEvent(
+              nextCalendar.eventId,
+              nextTitle,
+              nextDescription,
+              nextNotification.time,
+              nextNotification.repeats,
+              nextResponsible,
+            );
+          } catch (error) {
+            console.error("[task-store] Failed to update calendar event:", error);
+          }
+        }
+      }
+
       const updatedTask: Task = {
         ...oldTask,
         title: nextTitle,
@@ -355,6 +480,7 @@ export const createTaskState =
         imageUri: nextImageUri,
         location: nextLocation,
         responsible: nextResponsible,
+        calendar: nextCalendar,
       };
 
       const nextTasks = [...projectTasks];
@@ -379,13 +505,28 @@ export const createTaskState =
           if (t.notification?.notificationId) {
             await safeCancel(t.notification.notificationId);
           }
+          await safeCalendarDelete(t.calendar?.eventId ?? null);
         }
       }
+
+      // completeTask sets completed=true and notificationId=null.
+      // We also need to null out eventId while preserving the calendar preference.
+      const completedList = completeTask(projectTasks, id);
+      const affectedIds = item
+        ? new Set([item.id, ...descendants(projectTasks, id).map((t) => t.id)])
+        : new Set<string>();
+
+      const finalList = completedList.map((t) => {
+        if (affectedIds.has(t.id) && t.calendar) {
+          return { ...t, calendar: { eventId: null } };
+        }
+        return t;
+      });
 
       set({
         tasks: {
           ...get().tasks,
-          [projectId]: completeTask(projectTasks, id),
+          [projectId]: finalList,
         },
       });
     },
@@ -405,6 +546,7 @@ export const createTaskState =
       const projectTasks = get().tasks[projectId] || [];
       for (const t of projectTasks) {
         await safeCancel(t.notification?.notificationId ?? null);
+        await safeCalendarDelete(t.calendar?.eventId ?? null);
       }
       set({
         tasks: {
@@ -419,6 +561,7 @@ export const createTaskState =
       if (!projectTasks) return;
       for (const t of projectTasks) {
         await safeCancel(t.notification?.notificationId ?? null);
+        await safeCalendarDelete(t.calendar?.eventId ?? null);
       }
       // Immutably drop the project's key so subscribers re-render.
       const { [projectId]: _removed, ...rest } = get().tasks;
@@ -457,7 +600,7 @@ export const createTaskState =
   };
 
 export const createTaskStore = (
-  deps: TaskDeps = { notifications: notificationService },
+  deps: TaskDeps = { notifications: notificationService, calendar: calendarService },
 ): UseBoundStore<
   StoreApi<TaskState> & {
     persist: {

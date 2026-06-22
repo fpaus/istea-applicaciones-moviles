@@ -114,6 +114,8 @@ export default function EditScreen(): React.JSX.Element {
     responsible,
     pickResponsible,
     clearResponsible,
+    calendar,
+    setCalendar,
     isFormValid,
     handleSave,
   } = useEditTaskForm(projectId, taskId);
@@ -235,6 +237,15 @@ export default function EditScreen(): React.JSX.Element {
             <Switch
               value={repeats}
               onValueChange={setRepeats}
+              trackColor={{ true: Colors.light.primary }}
+            />
+          </View>
+
+          <View style={styles.switchContainer}>
+            <Typography variant="body">Agregar al calendario</Typography>
+            <Switch
+              value={calendar}
+              onValueChange={setCalendar}
               trackColor={{ true: Colors.light.primary }}
             />
           </View>

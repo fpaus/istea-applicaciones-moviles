@@ -64,6 +64,13 @@ export function CardItem({
           </Typography>
         </View>
       )}
+      {item.calendar && (
+        <View style={styles.calendarIndicator}>
+          <Typography variant="caption" style={styles.calendarText}>
+            📅 Sincronizado con el calendario
+          </Typography>
+        </View>
+      )}
       {childrenCount !== undefined && childrenCount > 0 && (
         <View style={styles.progressContainer}>
           <Typography variant="caption" style={styles.progressText}>
@@ -201,6 +208,15 @@ const styles = StyleSheet.create({
     marginBottom: Utility.spacing.m,
   },
   responsibleText: {
+    color: "#64748B",
+    fontSize: 12,
+  },
+  calendarIndicator: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: Utility.spacing.m,
+  },
+  calendarText: {
     color: "#64748B",
     fontSize: 12,
   },

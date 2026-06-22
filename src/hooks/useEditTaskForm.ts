@@ -33,6 +33,8 @@ export interface UseEditTaskFormResult {
   responsible: NonNullable<Task["responsible"]> | null;
   pickResponsible: () => Promise<void>;
   clearResponsible: () => void;
+  calendar: boolean;
+  setCalendar: (calendar: boolean) => void;
   isFormValid: boolean;
   handleSave: () => Promise<void>;
 }
@@ -73,6 +75,7 @@ export function useEditTaskForm(
   const [responsible, setResponsible] = useState<NonNullable<Task["responsible"]> | null>(
     oldTask?.responsible ?? null,
   );
+  const [calendar, setCalendar] = useState(!!oldTask?.calendar);
 
   const isFormValid =
     title.trim() !== "" &&
@@ -184,6 +187,11 @@ export function useEditTaskForm(
       }
     }
 
+    const calendarEnabledChanged = calendar !== !!oldTask.calendar;
+    if (calendarEnabledChanged) {
+      patch.calendar = calendar ? { eventId: null } : null;
+    }
+
     if (Object.keys(patch).length > 0) {
       await updateTask(projectId, taskId, patch, projectName);
     }
@@ -203,6 +211,7 @@ export function useEditTaskForm(
     imageUri,
     location,
     responsible,
+    calendar,
     oldTask,
     projectName,
   ]);
@@ -231,7 +240,10 @@ export function useEditTaskForm(
     responsible,
     pickResponsible,
     clearResponsible,
+    calendar,
+    setCalendar,
     isFormValid,
     handleSave,
   };
 }
+

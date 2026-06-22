@@ -154,3 +154,26 @@ describe("CardItem responsible indicator", () => {
     expect(queryByText(/👤/)).toBeNull();
   });
 });
+
+describe("CardItem calendar indicator", () => {
+  it("renders a calendar indicator when the task has a calendar", () => {
+    const withCalendar: Task = {
+      ...task,
+      calendar: { eventId: "cal-event-123" },
+    };
+    const { getByText } = render(
+      <CardItem item={withCalendar} onMarkCompleted={noop} onDelete={noop} />,
+    );
+
+    expect(getByText("📅 Sincronizado con el calendario")).toBeTruthy();
+  });
+
+  it("renders no calendar indicator when the task has no calendar", () => {
+    const { queryByText } = render(
+      <CardItem item={task} onMarkCompleted={noop} onDelete={noop} />,
+    );
+
+    expect(queryByText(/📅/)).toBeNull();
+  });
+});
+

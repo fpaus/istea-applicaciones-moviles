@@ -76,6 +76,17 @@ export default function DetailScreen(): React.JSX.Element {
         </Typography>
       </Card>
 
+      {task.calendar && (
+        <Card style={styles.metaCard}>
+          <Typography variant="caption" style={styles.metaLabel}>
+            Calendario
+          </Typography>
+          <Typography variant="body" style={styles.calendarStatus}>
+            📅 Sincronizado con el calendario
+          </Typography>
+        </Card>
+      )}
+
       {task.location && (
         <Card style={styles.metaCard}>
           <Typography variant="caption" style={styles.metaLabel}>
@@ -257,5 +268,9 @@ const styles = StyleSheet.create({
   responsibleEmail: {
     color: "#64748B",
     marginTop: Utility.spacing.xs,
+  },
+  calendarStatus: {
+    fontWeight: "600",
+    color: "#1E293B",
   },
 });

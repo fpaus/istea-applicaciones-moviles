@@ -329,4 +329,51 @@ describe("useAddTaskForm", () => {
       expect(result.current.responsible).toBeNull();
     });
   });
+
+  describe("calendar integration", () => {
+    it("calendar state defaults to false, toggles, and submits calendar object when hasReminder is true", async () => {
+      const { result } = renderHook(() => useAddTaskForm());
+
+      expect(result.current.calendar).toBe(false);
+
+      act(() => {
+        result.current.setCalendar(true);
+      });
+      expect(result.current.calendar).toBe(true);
+
+      act(() => {
+        result.current.setTitle("Calendar Task");
+        result.current.setHasReminder(true);
+        result.current.setHour(10);
+        result.current.setMinute(0);
+      });
+
+      await act(async () => {
+        await result.current.handleSave();
+      });
+
+      const tasks = useTaskStore.getState().tasks["p1"];
+      expect(tasks).toHaveLength(1);
+      expect(tasks[0].calendar).toEqual({ eventId: expect.any(String) });
+    });
+
+    it("submits null for calendar if calendar is true but hasReminder is false", async () => {
+      const { result } = renderHook(() => useAddTaskForm());
+
+      act(() => {
+        result.current.setTitle("No Reminder Task");
+        result.current.setCalendar(true);
+        result.current.setHasReminder(false);
+      });
+
+      await act(async () => {
+        await result.current.handleSave();
+      });
+
+      const tasks = useTaskStore.getState().tasks["p1"];
+      expect(tasks).toHaveLength(1);
+      expect(tasks[0].calendar).toBeNull();
+    });
+  });
 });
+

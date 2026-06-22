@@ -1,6 +1,6 @@
 import { createStore, StoreApi } from "zustand/vanilla";
 import { createTaskState } from "../task-store";
-import { NotificationScheduler, TaskState } from "../types";
+import { NotificationScheduler, CalendarScheduler, TaskState } from "../types";
 import { NewTask } from "../../types";
 
 function makeFakeNotifications() {
@@ -1027,6 +1027,291 @@ describe("task store", () => {
       const task = store.getState().tasks["project-1"][0];
       expect(task.title).toBe("Renamed");
       expect(task.responsible).toEqual(sampleResponsible);
+    });
+  });
+
+  describe("calendar event integration", () => {
+    function makeFakeCalendar() {
+      return {
+        createEvent: jest.fn(async (): Promise<string | null> => "cal-event-1"),
+        updateEvent: jest.fn(async () => {}),
+        deleteEvent: jest.fn(async () => {}),
+      } satisfies CalendarScheduler;
+    }
+
+    function makeCalendarStore(
+      notifications: NotificationScheduler,
+      calendar: CalendarScheduler,
+    ): StoreApi<TaskState> {
+      return createStore(createTaskState({ notifications, calendar }));
+    }
+
+    const calInput: NewTask = {
+      title: "Calendar task",
+      description: "With calendar",
+      notification: {
+        time: { hour: 9, minute: 0 },
+        repeats: true,
+        notificationId: null,
+      },
+      calendar: { eventId: null },
+    };
+
+    it("addTask creates a calendar event when calendar is set", async () => {
+      const notifications = makeFakeNotifications();
+      const calendar = makeFakeCalendar();
+      const store = makeCalendarStore(notifications, calendar);
+
+      await store.getState().addTask("p1", "Work", calInput);
+
+      expect(calendar.createEvent).toHaveBeenCalledWith(
+        "Calendar task",
+        "With calendar",
+        { hour: 9, minute: 0 },
+        true,
+        undefined,
+      );
+
+      const task = store.getState().tasks["p1"][0];
+      expect(task.calendar).toEqual({ eventId: "cal-event-1" });
+    });
+
+    it("addTask does not create a calendar event when calendar is null", async () => {
+      const notifications = makeFakeNotifications();
+      const calendar = makeFakeCalendar();
+      const store = makeCalendarStore(notifications, calendar);
+
+      await store.getState().addTask("p1", "Work", {
+        ...calInput,
+        calendar: null,
+      });
+
+      expect(calendar.createEvent).not.toHaveBeenCalled();
+      expect(store.getState().tasks["p1"][0].calendar).toBeNull();
+    });
+
+    it("addTask passes the responsible to createEvent when available", async () => {
+      const notifications = makeFakeNotifications();
+      const calendar = makeFakeCalendar();
+      const store = makeCalendarStore(notifications, calendar);
+      const resp = { name: "Juan", email: "juan@test.com" };
+
+      await store.getState().addTask("p1", "Work", {
+        ...calInput,
+        responsible: resp,
+      });
+
+      expect(calendar.createEvent).toHaveBeenCalledWith(
+        "Calendar task",
+        "With calendar",
+        { hour: 9, minute: 0 },
+        true,
+        resp,
+      );
+    });
+
+    it("deleteTask deletes the calendar event for the task and subtree", async () => {
+      const notifications = makeFakeNotifications();
+      const calendar = makeFakeCalendar();
+      calendar.createEvent
+        .mockResolvedValueOnce("cal-parent")
+        .mockResolvedValueOnce("cal-child");
+      const store = makeCalendarStore(notifications, calendar);
+
+      await store.getState().addTask("p1", "Work", calInput);
+      const parentId = store.getState().tasks["p1"][0].id;
+
+      await store.getState().addTask("p1", "Work", {
+        ...calInput,
+        title: "Child",
+        parentId,
+      });
+
+      await store.getState().deleteTask("p1", parentId);
+
+      expect(calendar.deleteEvent).toHaveBeenCalledWith("cal-parent");
+      expect(calendar.deleteEvent).toHaveBeenCalledWith("cal-child");
+    });
+
+    it("updateTask updates the calendar event when notification time changes", async () => {
+      const notifications = makeFakeNotifications();
+      const calendar = makeFakeCalendar();
+      const store = makeCalendarStore(notifications, calendar);
+
+      await store.getState().addTask("p1", "Work", calInput);
+      const id = store.getState().tasks["p1"][0].id;
+
+      notifications.scheduleNotification.mockResolvedValueOnce("notif-new");
+
+      await store.getState().updateTask("p1", id, {
+        notification: {
+          time: { hour: 14, minute: 30 },
+          repeats: false,
+          notificationId: null,
+        },
+      }, "Work");
+
+      expect(calendar.updateEvent).toHaveBeenCalledWith(
+        "cal-event-1",
+        "Calendar task",
+        "With calendar",
+        { hour: 14, minute: 30 },
+        false,
+        null,
+      );
+    });
+
+    it("updateTask creates a calendar event when calendar is toggled on", async () => {
+      const notifications = makeFakeNotifications();
+      const calendar = makeFakeCalendar();
+      const store = makeCalendarStore(notifications, calendar);
+
+      // Create without calendar
+      await store.getState().addTask("p1", "Work", {
+        ...calInput,
+        calendar: null,
+      });
+      const id = store.getState().tasks["p1"][0].id;
+
+      calendar.createEvent.mockResolvedValueOnce("cal-new");
+
+      await store.getState().updateTask("p1", id, {
+        calendar: { eventId: null },
+      });
+
+      expect(calendar.createEvent).toHaveBeenCalled();
+      expect(store.getState().tasks["p1"][0].calendar).toEqual({ eventId: "cal-new" });
+    });
+
+    it("updateTask deletes the calendar event when calendar is toggled off", async () => {
+      const notifications = makeFakeNotifications();
+      const calendar = makeFakeCalendar();
+      const store = makeCalendarStore(notifications, calendar);
+
+      await store.getState().addTask("p1", "Work", calInput);
+      const id = store.getState().tasks["p1"][0].id;
+
+      await store.getState().updateTask("p1", id, {
+        calendar: null,
+      });
+
+      expect(calendar.deleteEvent).toHaveBeenCalledWith("cal-event-1");
+      expect(store.getState().tasks["p1"][0].calendar).toBeNull();
+    });
+
+    it("updateTask deletes calendar event when reminder is removed", async () => {
+      const notifications = makeFakeNotifications();
+      const calendar = makeFakeCalendar();
+      const store = makeCalendarStore(notifications, calendar);
+
+      await store.getState().addTask("p1", "Work", calInput);
+      const id = store.getState().tasks["p1"][0].id;
+
+      await store.getState().updateTask("p1", id, {
+        notification: null,
+      });
+
+      expect(calendar.deleteEvent).toHaveBeenCalledWith("cal-event-1");
+      expect(store.getState().tasks["p1"][0].calendar).toBeNull();
+    });
+
+    it("markCompleted deletes calendar event and sets eventId to null but preserves preference", async () => {
+      const notifications = makeFakeNotifications();
+      const calendar = makeFakeCalendar();
+      const store = makeCalendarStore(notifications, calendar);
+
+      await store.getState().addTask("p1", "Work", calInput);
+      const id = store.getState().tasks["p1"][0].id;
+
+      await store.getState().markCompleted("p1", id);
+
+      expect(calendar.deleteEvent).toHaveBeenCalledWith("cal-event-1");
+      const task = store.getState().tasks["p1"][0];
+      expect(task.completed).toBe(true);
+      // Preference preserved but eventId is null
+      expect(task.calendar).toEqual({ eventId: null });
+    });
+
+    it("reopenTask recreates the calendar event", async () => {
+      const notifications = makeFakeNotifications();
+      const calendar = makeFakeCalendar();
+      const store = makeCalendarStore(notifications, calendar);
+
+      jest.useFakeTimers();
+      jest.setSystemTime(new Date(2026, 0, 1, 8, 0, 0)); // 08:00
+
+      await store.getState().addTask("p1", "Work", calInput);
+      const id = store.getState().tasks["p1"][0].id;
+
+      await store.getState().markCompleted("p1", id);
+      calendar.createEvent.mockClear();
+      calendar.createEvent.mockResolvedValueOnce("cal-event-new");
+
+      await store.getState().reopenTask("p1", id, "Work");
+
+      expect(calendar.createEvent).toHaveBeenCalledWith(
+        "Calendar task",
+        "With calendar",
+        { hour: 9, minute: 0 },
+        true,
+        null,
+      );
+
+      const task = store.getState().tasks["p1"][0];
+      expect(task.calendar).toEqual({ eventId: "cal-event-new" });
+
+      jest.useRealTimers();
+    });
+
+    // Resilience tests
+    it("addTask still creates the task when calendar createEvent fails", async () => {
+      const notifications = makeFakeNotifications();
+      const calendar = makeFakeCalendar();
+      calendar.createEvent.mockRejectedValue(new Error("cal fail"));
+      const errorSpy = jest.spyOn(console, "error").mockImplementation(() => {});
+      const store = makeCalendarStore(notifications, calendar);
+
+      await store.getState().addTask("p1", "Work", calInput);
+
+      const task = store.getState().tasks["p1"][0];
+      expect(task.title).toBe("Calendar task");
+      expect(task.calendar).toEqual({ eventId: null });
+      errorSpy.mockRestore();
+    });
+
+    it("markCompleted still succeeds when calendar deleteEvent fails", async () => {
+      const notifications = makeFakeNotifications();
+      const calendar = makeFakeCalendar();
+      const store = makeCalendarStore(notifications, calendar);
+
+      await store.getState().addTask("p1", "Work", calInput);
+      const id = store.getState().tasks["p1"][0].id;
+
+      calendar.deleteEvent.mockRejectedValue(new Error("delete fail"));
+      const errorSpy = jest.spyOn(console, "error").mockImplementation(() => {});
+
+      await store.getState().markCompleted("p1", id);
+
+      const task = store.getState().tasks["p1"][0];
+      expect(task.completed).toBe(true);
+      errorSpy.mockRestore();
+    });
+
+    it("deleteTask still removes the task when calendar deleteEvent fails", async () => {
+      const notifications = makeFakeNotifications();
+      const calendar = makeFakeCalendar();
+      const store = makeCalendarStore(notifications, calendar);
+
+      await store.getState().addTask("p1", "Work", calInput);
+      const id = store.getState().tasks["p1"][0].id;
+
+      calendar.deleteEvent.mockRejectedValue(new Error("delete fail"));
+      const errorSpy = jest.spyOn(console, "error").mockImplementation(() => {});
+
+      await store.getState().deleteTask("p1", id);
+
+      expect(store.getState().tasks["p1"]).toHaveLength(0);
+      errorSpy.mockRestore();
     });
   });
 });

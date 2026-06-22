@@ -27,6 +27,10 @@ export interface Location {
   label?: string;
 }
 
+export interface Calendar {
+  eventId: string | null;
+}
+
 export interface NewTask {
   title: string;
   description: string;
@@ -35,6 +39,7 @@ export interface NewTask {
   imageUri?: string | null;
   location?: Location | null;
   responsible?: Responsible | null;
+  calendar?: Calendar | null;
 }
 
 export interface Task extends NewTask {

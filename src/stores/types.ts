@@ -1,4 +1,4 @@
-import { NewTask, Task, Time, Project } from "../types";
+import { NewTask, Task, Time, Responsible, Project } from "../types";
 
 /**
  * Injectable side-effect dependency for the task store. The store calls
@@ -16,8 +16,33 @@ export interface NotificationScheduler {
   cancelAllNotifications(): Promise<void>;
 }
 
+/**
+ * Injectable side-effect dependency for calendar event management.
+ * Mirrors NotificationScheduler pattern. Implemented by `CalendarService`;
+ * replaced by a fake in tests.
+ */
+export interface CalendarScheduler {
+  createEvent(
+    title: string,
+    notes: string,
+    time: Time,
+    repeats: boolean,
+    responsible?: Pick<Responsible, "name" | "email"> | null,
+  ): Promise<string | null>;
+  updateEvent(
+    eventId: string,
+    title: string,
+    notes: string,
+    time: Time,
+    repeats: boolean,
+    responsible?: Pick<Responsible, "name" | "email"> | null,
+  ): Promise<void>;
+  deleteEvent(eventId: string): Promise<void>;
+}
+
 export interface TaskDeps {
   notifications: NotificationScheduler;
+  calendar?: CalendarScheduler;
 }
 
 export interface TaskState {

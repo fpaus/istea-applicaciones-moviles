@@ -582,4 +582,79 @@ describe("useEditTaskForm", () => {
       updateTaskSpy.mockRestore();
     });
   });
+
+  describe("calendar integration", () => {
+    it("initializes calendar as false if task has no calendar, toggles to true and sends calendar patch", async () => {
+      const updateTaskSpy = jest.spyOn(useTaskStore.getState(), "updateTask");
+      const { result } = renderHook(() => useEditTaskForm("p1", "t1"));
+
+      expect(result.current.calendar).toBe(false);
+
+      act(() => {
+        result.current.setCalendar(true);
+      });
+      expect(result.current.calendar).toBe(true);
+
+      await act(async () => {
+        await result.current.handleSave();
+      });
+
+      expect(updateTaskSpy).toHaveBeenCalledWith(
+        "p1",
+        "t1",
+        {
+          calendar: { eventId: null },
+        },
+        "Work",
+      );
+      updateTaskSpy.mockRestore();
+    });
+
+    it("initializes calendar as true if task has calendar, toggles to false and sends null patch", async () => {
+      useTaskStore.setState({
+        tasks: {
+          p1: [
+            {
+              id: "t_cal",
+              title: "Task with Calendar",
+              description: "",
+              notification: {
+                time: { hour: 9, minute: 0 },
+                repeats: true,
+                notificationId: "notif-1",
+              },
+              calendar: { eventId: "cal-1" },
+              completed: false,
+              createdAt: 100,
+            },
+          ],
+        },
+      });
+
+      const updateTaskSpy = jest.spyOn(useTaskStore.getState(), "updateTask");
+      const { result } = renderHook(() => useEditTaskForm("p1", "t_cal"));
+
+      expect(result.current.calendar).toBe(true);
+
+      act(() => {
+        result.current.setCalendar(false);
+      });
+      expect(result.current.calendar).toBe(false);
+
+      await act(async () => {
+        await result.current.handleSave();
+      });
+
+      expect(updateTaskSpy).toHaveBeenCalledWith(
+        "p1",
+        "t_cal",
+        {
+          calendar: null,
+        },
+        "Work",
+      );
+      updateTaskSpy.mockRestore();
+    });
+  });
 });
+

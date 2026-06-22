@@ -97,4 +97,41 @@ describe("DetailScreen subtask completion", () => {
     const { queryByText } = render(<DetailScreen />);
     expect(queryByText("Ubicación")).toBeNull();
   });
+
+  it("renders calendar details when calendar is present on the task", () => {
+    useTaskStore.setState({
+      tasks: {
+        p1: [
+          makeTask({
+            id: "t1",
+            title: "Parent",
+            calendar: { eventId: "cal-event-123" },
+          }),
+        ],
+      },
+      hasHydrated: true,
+    });
+
+    const { getByText } = render(<DetailScreen />);
+    expect(getByText("📅 Sincronizado con el calendario")).toBeTruthy();
+  });
+
+  it("does not render calendar details when calendar is absent", () => {
+    useTaskStore.setState({
+      tasks: {
+        p1: [
+          makeTask({
+            id: "t1",
+            title: "Parent",
+            calendar: null,
+          }),
+        ],
+      },
+      hasHydrated: true,
+    });
+
+    const { queryByText } = render(<DetailScreen />);
+    expect(queryByText("📅 Sincronizado con el calendario")).toBeNull();
+  });
 });
+

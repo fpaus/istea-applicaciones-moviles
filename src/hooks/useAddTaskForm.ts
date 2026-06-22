@@ -30,6 +30,8 @@ export interface UseAddTaskFormResult {
   responsible: NonNullable<Task["responsible"]> | null;
   pickResponsible: () => Promise<void>;
   clearResponsible: () => void;
+  calendar: boolean;
+  setCalendar: (calendar: boolean) => void;
   isFormValid: boolean;
   handleSave: () => Promise<void>;
 }
@@ -52,6 +54,7 @@ export function useAddTaskForm(): UseAddTaskFormResult {
   const [location, setLocation] = useState<{ latitude: number; longitude: number; label?: string } | null>(null);
   const [isLocating, setIsLocating] = useState(false);
   const [responsible, setResponsible] = useState<NonNullable<Task["responsible"]> | null>(null);
+  const [calendar, setCalendar] = useState(false);
 
   const isFormValid =
     title.trim() !== "" &&
@@ -107,6 +110,7 @@ export function useAddTaskForm(): UseAddTaskFormResult {
       imageUri,
       location,
       responsible,
+      calendar: hasReminder && calendar ? { eventId: null } : null,
     });
 
     setTitle("");
@@ -118,9 +122,10 @@ export function useAddTaskForm(): UseAddTaskFormResult {
     setImageUri(null);
     setLocation(null);
     setResponsible(null);
+    setCalendar(false);
 
     router.back();
-  }, [addTask, router, title, description, hasReminder, hour, minute, repeats, imageUri, location, responsible]);
+  }, [addTask, router, title, description, hasReminder, hour, minute, repeats, imageUri, location, responsible, calendar]);
 
   return {
     title,
@@ -146,7 +151,10 @@ export function useAddTaskForm(): UseAddTaskFormResult {
     responsible,
     pickResponsible,
     clearResponsible,
+    calendar,
+    setCalendar,
     isFormValid,
     handleSave,
   };
 }
+
