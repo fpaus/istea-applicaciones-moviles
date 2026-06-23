@@ -85,6 +85,20 @@ La aplicación se estructura en torno a una arquitectura resiliente y un sistema
 
 ---
 
+## Cómo Ejecutar los tests
+
+    ```bash
+    npm run test
+    ```
+
+Verificar cobertura de código:
+
+    ```bash
+    npm run test:coverage
+    ```
+
+---
+
 ## Uso de IA
 
 La documentación del uso de la IA se encuentra en [IA_USAGE.md](IA_USAGE.md).
