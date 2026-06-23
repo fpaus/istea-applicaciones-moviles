@@ -10,7 +10,6 @@ export function useProject() {
   const hasHydrated = useProjectStore((s) => s.hasHydrated);
   const selectProject = useProjectStore((s) => s.selectProject);
   const createProject = useProjectStore((s) => s.createProject);
-  const deselectProject = useProjectStore((s) => s.deselectProject);
 
   return useMemo(
     () => ({
@@ -20,15 +19,7 @@ export function useProject() {
       projects,
       selectProject,
       createProject,
-      deselectProject,
     }),
-    [
-      currentProject,
-      projects,
-      hasHydrated,
-      selectProject,
-      createProject,
-      deselectProject,
-    ],
+    [currentProject, projects, hasHydrated, selectProject, createProject],
   );
 }

@@ -1,5 +1,5 @@
 import { Task } from "../../types";
-import { childrenOf, descendants, ancestors, completeTask, reopenTask } from "../tasks-cascade";
+import { descendants, ancestors, completeTask, reopenTask } from "../tasks-cascade";
 
 const mockTasks: Task[] = [
   { id: "root-1", title: "Root 1", description: "", completed: false, createdAt: 1, parentId: null },
@@ -10,18 +10,6 @@ const mockTasks: Task[] = [
 ];
 
 describe("pure cascade engine helpers", () => {
-  describe("childrenOf", () => {
-    it("returns direct children of a task", () => {
-      const children = childrenOf(mockTasks, "root-1");
-      expect(children.map((c) => c.id)).toEqual(["child-1", "child-2"]);
-    });
-
-    it("returns empty array if no children exist", () => {
-      const children = childrenOf(mockTasks, "grandchild-1");
-      expect(children).toEqual([]);
-    });
-  });
-
   describe("descendants", () => {
     it("returns all descendants recursively", () => {
       const desc = descendants(mockTasks, "root-1");

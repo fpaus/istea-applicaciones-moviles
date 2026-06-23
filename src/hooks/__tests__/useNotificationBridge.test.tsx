@@ -23,7 +23,6 @@ jest.mock("../../services/notifications", () => ({
     },
     scheduleNotification: jest.fn(),
     cancelNotification: jest.fn(),
-    cancelAllNotifications: jest.fn(),
     requestPermission: jest.fn(),
   },
 }));

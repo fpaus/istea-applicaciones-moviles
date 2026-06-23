@@ -133,13 +133,6 @@ describe("NotificationService cancellation & listeners", () => {
     );
   });
 
-  it("cancels all scheduled notifications", async () => {
-    await service.cancelAllNotifications();
-    expect(
-      Notifications.cancelAllScheduledNotificationsAsync,
-    ).toHaveBeenCalledTimes(1);
-  });
-
   it("registers a received-notification listener", () => {
     const cb = jest.fn();
     service.addNotificationReceivedListener(cb);
@@ -220,7 +213,6 @@ describe("NotificationService when expo-notifications fails to load", () => {
     expect(scheduled).toBeNull();
 
     await expect(service.cancelNotification("123")).resolves.toBeUndefined();
-    await expect(service.cancelAllNotifications()).resolves.toBeUndefined();
 
     const sub = service.addNotificationReceivedListener(() => {});
     expect(sub).toBeDefined();
@@ -259,7 +251,6 @@ describe("NotificationService on web platform", () => {
     expect(await service.checkPermission()).toBe(false);
     expect(await service.scheduleNotification("t", "b", { hour: 9, minute: 0 }, true)).toBeNull();
     await expect(service.cancelNotification("123")).resolves.toBeUndefined();
-    await expect(service.cancelAllNotifications()).resolves.toBeUndefined();
 
     const sub = service.addNotificationReceivedListener(() => {});
     expect(typeof sub.remove).toBe("function");

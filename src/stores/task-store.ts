@@ -1,6 +1,6 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { StateCreator, StoreApi, UseBoundStore, create } from "zustand";
-import { createJSONStorage, devtools, persist, PersistOptions } from "zustand/middleware";
+import { StateCreator, create } from "zustand";
+import { createJSONStorage, persist } from "zustand/middleware";
 import { notificationService } from "../services/notifications";
 import { calendarService } from "../services/calendar";
 import { Task } from "../types";
@@ -601,45 +601,18 @@ export const createTaskState =
 
 export const createTaskStore = (
   deps: TaskDeps = { notifications: notificationService, calendar: calendarService },
-): UseBoundStore<
-  StoreApi<TaskState> & {
-    persist: {
-      rehydrate: () => Promise<void> | void;
-      hasHydrated: () => boolean;
-      onHydrate: (fn: (state: TaskState) => void) => () => void;
-      onFinishHydration: (fn: (state: TaskState) => void) => () => void;
-      clearStorage: () => void;
-      getOptions: () => Partial<PersistOptions<TaskState, unknown>>;
-      setOptions: (options: Partial<PersistOptions<TaskState, unknown>>) => void;
-    };
-  }
-> =>
+) =>
   create<TaskState>()(
-    devtools(
-      persist(createTaskState(deps), {
-        name: STORAGE_KEY,
-        storage: createJSONStorage(() => AsyncStorage),
-        partialize: (state) => ({ tasks: state.tasks }),
-        merge: (persistedState, currentState) => ({
-          ...currentState,
-          tasks: (persistedState as Partial<TaskState>)?.tasks ?? {},
-        }),
-        onRehydrateStorage: () => (state) => state?.setHasHydrated?.(true),
+    persist(createTaskState(deps), {
+      name: STORAGE_KEY,
+      storage: createJSONStorage(() => AsyncStorage),
+      partialize: (state) => ({ tasks: state.tasks }),
+      merge: (persistedState, currentState) => ({
+        ...currentState,
+        tasks: (persistedState as Partial<TaskState>)?.tasks ?? {},
       }),
-      { name: "TaskStore" },
-    ),
+      onRehydrateStorage: () => (state) => state?.setHasHydrated?.(true),
+    }),
   );
 
-export const useTaskStore: UseBoundStore<
-  StoreApi<TaskState> & {
-    persist: {
-      rehydrate: () => Promise<void> | void;
-      hasHydrated: () => boolean;
-      onHydrate: (fn: (state: TaskState) => void) => () => void;
-      onFinishHydration: (fn: (state: TaskState) => void) => () => void;
-      clearStorage: () => void;
-      getOptions: () => Partial<PersistOptions<TaskState, unknown>>;
-      setOptions: (options: Partial<PersistOptions<TaskState, unknown>>) => void;
-    };
-  }
-> = createTaskStore();
+export const useTaskStore = createTaskStore();

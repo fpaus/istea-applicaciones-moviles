@@ -1,13 +1,6 @@
 import { Task } from "../types";
 
 /**
- * Returns direct children of the given task ID.
- */
-export function childrenOf(tasks: Task[], id: string): Task[] {
-  return tasks.filter((t) => t.parentId === id);
-}
-
-/**
  * Returns all descendants (direct and indirect) of the given task ID.
  */
 export function descendants(tasks: Task[], id: string): Task[] {

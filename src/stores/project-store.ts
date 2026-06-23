@@ -1,6 +1,6 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { StateCreator, create } from "zustand";
-import { createJSONStorage, devtools, persist } from "zustand/middleware";
+import { createJSONStorage, persist } from "zustand/middleware";
 import { ProjectState } from "./types";
 import { Project } from "../types";
 import { generateUUID } from "../utils/uuid";
@@ -76,27 +76,17 @@ export const createProjectState =
       });
     },
 
-    deselectProject: async () => {
-      set({ currentProject: null });
-    },
-
     setHasHydrated: (value) => set({ hasHydrated: value }),
   });
 
-export const createProjectStore = () =>
-  create<ProjectState>()(
-    devtools(
-      persist(createProjectState(), {
-        name: STORAGE_KEY,
-        storage: createJSONStorage(() => AsyncStorage),
-        partialize: (state) => ({
-          currentProject: state.currentProject,
-          projects: state.projects,
-        }),
-        onRehydrateStorage: () => (state) => state?.setHasHydrated(true),
-      }),
-      { name: "ProjectStore" },
-    ),
-  );
-
-export const useProjectStore = createProjectStore();
+export const useProjectStore = create<ProjectState>()(
+  persist(createProjectState(), {
+    name: STORAGE_KEY,
+    storage: createJSONStorage(() => AsyncStorage),
+    partialize: (state) => ({
+      currentProject: state.currentProject,
+      projects: state.projects,
+    }),
+    onRehydrateStorage: () => (state) => state?.setHasHydrated(true),
+  }),
+);

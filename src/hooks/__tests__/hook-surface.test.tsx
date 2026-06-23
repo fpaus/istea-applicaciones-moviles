@@ -1,13 +1,13 @@
 import { act, renderHook } from "@testing-library/react-native";
 import { Alert } from "react-native";
 
-import { useProject } from "../useProject";
-import { useActiveTasks } from "../useActiveTasks";
-import { useCompletedTasks } from "../useCompletedTasks";
-import { useTaskActions } from "../useTaskActions";
 import { useProjectStore } from "../../stores/project-store";
 import { useTaskStore } from "../../stores/task-store";
 import { Task } from "../../types";
+import { useActiveTasks } from "../useActiveTasks";
+import { useCompletedTasks } from "../useCompletedTasks";
+import { useProject } from "../useProject";
+import { useTaskActions } from "../useTaskActions";
 
 const activeTask: Task = {
   id: "1",
@@ -46,7 +46,6 @@ describe("useProject selector", () => {
     expect(result.current.projects).toHaveLength(1);
     expect(typeof result.current.selectProject).toBe("function");
     expect(typeof result.current.createProject).toBe("function");
-    expect(typeof result.current.deselectProject).toBe("function");
   });
 
   it("reports not selected when there is no active project", () => {

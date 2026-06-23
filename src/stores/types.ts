@@ -13,7 +13,6 @@ export interface NotificationScheduler {
     repeats: boolean,
   ): Promise<string | null>;
   cancelNotification(id: string): Promise<void>;
-  cancelAllNotifications(): Promise<void>;
 }
 
 /**
@@ -88,6 +87,5 @@ export interface ProjectState {
   createProject: (name: string) => Promise<void>;
   renameProject: (id: string, name: string) => Promise<void>;
   deleteProject: (id: string) => Promise<void>;
-  deselectProject: () => Promise<void>;
   setHasHydrated: (value: boolean) => void;
 }

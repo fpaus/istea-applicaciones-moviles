@@ -35,8 +35,6 @@ if (Notifications) {
   }
 }
 
-export type PermissionStatus = "idle" | "granted" | "denied" | "loading";
-
 export class NotificationService {
   async requestPermission(): Promise<boolean> {
     if (!Notifications) {
@@ -155,15 +153,6 @@ export class NotificationService {
       return;
     }
     await Notifications.cancelScheduledNotificationAsync(id).catch(
-      console.error,
-    );
-  }
-
-  async cancelAllNotifications(): Promise<void> {
-    if (!Notifications) {
-      return;
-    }
-    await Notifications.cancelAllScheduledNotificationsAsync().catch(
       console.error,
     );
   }

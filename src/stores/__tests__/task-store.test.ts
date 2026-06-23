@@ -7,7 +7,6 @@ function makeFakeNotifications() {
   return {
     scheduleNotification: jest.fn(async (): Promise<string | null> => "notif-1"),
     cancelNotification: jest.fn(async () => {}),
-    cancelAllNotifications: jest.fn(async () => {}),
   } satisfies NotificationScheduler;
 }
 

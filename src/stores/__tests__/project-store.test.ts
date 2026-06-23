@@ -38,17 +38,6 @@ describe("project store", () => {
     expect(store.getState().currentProject).toEqual(proj);
   });
 
-  it("deselectProject clears the currentProject", async () => {
-    const store = makeStore();
-    await store.getState().createProject("My Project");
-    const proj = store.getState().projects[0];
-
-    await store.getState().selectProject(proj.id);
-    await store.getState().deselectProject();
-
-    expect(store.getState().currentProject).toBeNull();
-  });
-
   it("selectProject throws an error if project is not found", async () => {
     const store = makeStore();
     await expect(store.getState().selectProject("non-existent-id")).rejects.toThrow(
