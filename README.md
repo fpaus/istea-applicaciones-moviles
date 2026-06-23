@@ -54,7 +54,7 @@ La aplicación se estructura en torno a una arquitectura resiliente y un sistema
 
 ---
 
-* **Demo video**: [Demo](https://drive.google.com/file/d/1nGCOjWxCeODlvYzre_r5Bx3lGb2axTk1/view)
+* **Demo video**: [Demo](https://drive.google.com/file/d/1viPD6LWCJKy4t5KQqQyszs56Yi3g_yoF/view)
 
 ## Requisitos Previos
 
@@ -82,6 +82,12 @@ La aplicación se estructura en torno a una arquitectura resiliente y un sistema
     * Presionar **`i`** para abrir la aplicación en el Simulador de iOS.
     * Presionar **`w`** para iniciar y navegar en el navegador web local.
     * Escanear el **Código QR** generado con la cámara de tu teléfono (iOS) o con la aplicación Expo Go (Android) para ejecutarla directamente en un dispositivo físico.
+
+---
+
+## Uso de IA
+
+La documentación del uso de la IA se encuentra en [IA_USAGE.md](IA_USAGE.md).
 
 ---
 
